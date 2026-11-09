@@ -1,0 +1,1 @@
+(not person(X) or shaves(barber, X) or shaves(X, X)) and (not person(Y) or not shaves(barber, Y) or not shaves(Y, Y)) and person(barber)

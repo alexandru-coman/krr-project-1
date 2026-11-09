@@ -1,0 +1,1 @@
+toddler and (not toddler or child) and (not child or not male or boy) and (not infant or child) and (not child or not female or girl) and female and girl

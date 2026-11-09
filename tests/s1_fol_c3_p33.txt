@@ -1,0 +1,1 @@
+(not animal(X) or loves(john, X)) and (not loves(Y, Z) or not kills(Y, Z)) and animal(cat) and kills(john, cat)

@@ -1,0 +1,1 @@
+(not student(X) or not submits(X) or not passes(X) or graduates(X)) and (not student(Y) or not diligent(Y) or submits(Y)) and (not student(Z) or not attends(Z) or passes(Z)) and student(alex) and diligent(alex) and attends(alex) and not graduates(alex)

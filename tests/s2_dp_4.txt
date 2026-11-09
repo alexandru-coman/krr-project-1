@@ -1,0 +1,1 @@
+(not b or a) and (not a or b or e) and e and (a or not e) and not a

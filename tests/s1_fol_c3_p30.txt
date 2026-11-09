@@ -1,0 +1,1 @@
+(not man(X) or mortal(X)) and man(socrates) and not mortal(socrates)
