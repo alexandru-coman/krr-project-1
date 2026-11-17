@@ -3,7 +3,7 @@ import sys
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Preformatted, KeepTogether
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Preformatted, KeepTogether, Image
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
@@ -200,46 +200,17 @@ def build_pdf():
     """
     story.append(Paragraph(p_cnf, body_style))
 
-    tree_text = r"""
-                   C1: {¬student(X), ¬submits(X), ¬passes(X), graduates(X)}
-                                           |
-                  C7: {¬graduates(alex)}   |  [MGU: X = alex]
-                            \             /
-                             \           /
-        C8: {¬student(alex), ¬submits(alex), ¬passes(alex)}
-                  \                 /
-                   \               /   C4: {student(alex)}
-                    \             /
-           C9: {¬submits(alex), ¬passes(alex)}
-                  /                 \
-                 /                   \  C2: {¬student(Y), ¬diligent(Y), submits(Y)}
-                /                     \   [MGU: Y = alex]
-     C10: {¬passes(alex), ¬student(alex), ¬diligent(alex)}
-               \                       /
-                \                     /   C4: {student(alex)}
-                 \                   /
-          C11: {¬passes(alex), ¬diligent(alex)}
-                   \                 /
-                    \               /   C5: {diligent(alex)}
-                     \             /
-                 C12: {¬passes(alex)}
-                        /          \
-                       /            \  C3: {¬student(Z), ¬attends(Z), passes(Z)}
-                      /              \   [MGU: Z = alex]
-          C13: {¬student(alex), ¬attends(alex)}
-                   \                 /
-                    \               /   C4: {student(alex)}
-                     \             /
-                 C14: {¬attends(alex)}
-                        \           /
-                         \         /   C6: {attends(alex)}
-                          \       /
-                         C15: [ ]  (EMPTY CLAUSE -> ENTAILMENT PROVEN)
-"""
-    story.append(KeepTogether([
-        Preformatted(tree_text, tree_style),
-        Paragraph("The derivation of the empty clause [] completes the refutation, proving KB |= graduates(alex).", body_style)
-    ]))
+    tree_img_path = os.path.join(DOC_DIR, "resolution_tree.png")
+    if os.path.exists(tree_img_path):
+        story.append(KeepTogether([
+            Image(tree_img_path, width=470, height=520),
+            Spacer(1, 4),
+            Paragraph("<b>Figure 1:</b> Refutation Resolution Tree in First-Order Logic. The derivation of the empty clause [] completes the proof, verifying that <i>KB |= graduates(alex)</i>.", body_style)
+        ]))
+    else:
+        story.append(KeepTogether([
+            Paragraph("The derivation of the empty clause [] completes the refutation, proving KB |= graduates(alex).", body_style)
+        ]))
 
     story.append(Paragraph("1.c) Automatic FOL Resolution Evaluation", h2_style))
     story.append(Paragraph("The First-Order Logic resolution algorithm was implemented in Prolog (<i>resolution_fol.pl</i>), featuring standardizing apart, Robinson unification (MGU), factoring, and subsumption. The execution results on the test instances are summarized below:", body_style))
