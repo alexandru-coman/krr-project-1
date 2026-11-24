@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "GUI: Launch Tkinter App",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/gui/app.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/gui"
+    },
+    {
+      "name": "Doc: Generate Report PDF",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/doc/generate_pdf.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/doc"
+    }
+  ]
+}

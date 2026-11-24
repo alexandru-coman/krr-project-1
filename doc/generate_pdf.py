@@ -161,7 +161,7 @@ def build_pdf():
     
     meta_text = """
     <b>Author:</b> Coman Ioan Alexandru &nbsp;&nbsp;|&nbsp;&nbsp; <b>Institution:</b> Faculty of Mathematics and Computer Science, University of Bucharest<br/>
-    <b>Course:</b> Knowledge Representation and Reasoning (KRR) &nbsp;&nbsp;|&nbsp;&nbsp; <b>Instructor:</b> Conf. dr. Marina Anca Cidot&#259;<br/>
+    <b>Course:</b> Knowledge Representation and Reasoning (KRR) &nbsp;&nbsp;|&nbsp;&nbsp; <b>Instructor:</b> Conf. dr. Marina Anca Cidota<br/>
     <b>Submission Deadline:</b> December 12th, 2026
     """
     story.append(Paragraph(meta_text, meta_style))
@@ -191,7 +191,7 @@ def build_pdf():
 
     story.append(Paragraph("1.b) Transformation to CNF and Manual Resolution Proof", h2_style))
     p_cnf = """
-    By eliminating implications (&alpha; &rarr; &beta; &equiv; &not;&alpha; &lor; &beta;), applying De Morgan's laws, dropping universal quantifiers, and adding the negated query (&not;graduates(alex)), we obtain the refutation clause set:
+    By eliminating implications (&alpha; &rarr; &beta; &equiv; &not;&alpha; &or; &beta;), applying De Morgan's laws, dropping universal quantifiers, and adding the negated query (&not;graduates(alex)), we obtain the refutation clause set:
     <br/>
     &bull; C1: {&not;student(X), &not;submits(X), &not;passes(X), graduates(X)} &nbsp;&nbsp;&nbsp;&nbsp; &bull; C4: {student(alex)}<br/>
     &bull; C2: {&not;student(Y), &not;diligent(Y), submits(Y)} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&bull; C5: {diligent(alex)}<br/>
@@ -332,7 +332,7 @@ def build_pdf():
     2. Martin Davis and Hilary Putnam. <i>A Computing Procedure for Quantification Theory</i>. Journal of the ACM (JACM), 7(3):201-215, 1960.<br/>
     3. J. Alan Robinson. <i>A Machine-Oriented Logic Based on the Resolution Principle</i>. Journal of the ACM (JACM), 12(1):23-41, 1965.<br/>
     4. Jacques Herbrand. <i>Recherches sur la th&#233;orie de la d&#233;monstration</i>. PhD thesis, University of Paris, 1930.<br/>
-    5. Conf. dr. Marina Anca Cidot&#259;. Lecture slides on <i>Knowledge Representation and Reasoning</i> (C1-C5), FMI UniBuc, 2026.
+    5. Conf. dr. Marina Anca Cidota. Lecture slides on <i>Knowledge Representation and Reasoning</i> (C1-C5), FMI UniBuc, 2026.
     """
     story.append(Paragraph(p_ref, body_style))
 

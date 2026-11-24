@@ -8,223 +8,151 @@
 :- use_module(parser).
 
 solve_dp(Input, Strategy, Result, ModelFormatted) :-
-    (   is_list(Input) ->
-        Clauses = Input
-    ;   parse_kb_file(Input, Clauses)
-    ),
-    extract_all_atoms(Clauses, AllAtoms),
-    dp_loop(Clauses, Strategy, Outcome, RawModel),
+    ( is_list(Input) -> Clauses = Input ; parse_kb_file(Input, Clauses) ),
+    collect_all_atoms(Clauses, AllAtoms),
+    dp_solve(Clauses, Strategy, Outcome, PartialModel),
     (   Outcome == sat ->
         Result = 'YES',
-        fill_missing_atoms(AllAtoms, RawModel, CompleteModel),
+        fill_missing_atoms(AllAtoms, PartialModel, CompleteModel),
         format_solution(CompleteModel, ModelFormatted)
     ;   Result = 'NOT',
         ModelFormatted = '{}'
     ).
 
-solve_dp(Input, Strategy, Result) :-
-    solve_dp(Input, Strategy, Result, _).
+solve_dp(Input, Strategy, Result) :- solve_dp(Input, Strategy, Result, _).
+solve_dp(Input, Result) :- solve_dp(Input, moms, Result, _).
 
-solve_dp(Input, Result) :-
-    solve_dp(Input, moms, Result, _).
-
-dp_loop(Clauses, Strategy, Outcome, Model) :-
-    clean_dp_clauses(Clauses, Cleaned),
+dp_solve(Clauses, Strategy, Outcome, Model) :-
+    simplify_clauses(Clauses, Cleaned),
     (   member([], Cleaned) ->
-        Outcome = unsat,
-        Model = []
+        Outcome = unsat, Model = []
     ;   Cleaned == [] ->
-        Outcome = sat,
-        Model = []
-    ;   find_unit_clause(Cleaned, UnitLit) ->
-        apply_unit_literal(Cleaned, UnitLit, NextClauses),
-        unit_to_assignment(UnitLit, Atom, Val),
-        dp_loop(NextClauses, Strategy, Outcome, SubModel),
-        (   Outcome == sat ->
-            Model = [assign(Atom, Val)|SubModel]
-        ;   Model = []
-        )
+        Outcome = sat, Model = []
+    ;   member([UnitLit], Cleaned) ->
+        propagate_unit(Cleaned, UnitLit, Reduced),
+        lit_assignment(UnitLit, Atom, Value),
+        dp_solve(Reduced, Strategy, Outcome, SubModel),
+        ( Outcome == sat -> Model = [assign(Atom, Value) | SubModel] ; Model = [] )
     ;   find_pure_literal(Cleaned, PureLit) ->
-        apply_pure_literal(Cleaned, PureLit, NextClauses),
-        unit_to_assignment(PureLit, Atom, Val),
-        dp_loop(NextClauses, Strategy, Outcome, SubModel),
+        findall(Clause, (member(Clause, Cleaned), \+ member(PureLit, Clause)), Reduced),
+        lit_assignment(PureLit, Atom, Value),
+        dp_solve(Reduced, Strategy, Outcome, SubModel),
+        ( Outcome == sat -> Model = [assign(Atom, Value) | SubModel] ; Model = [] )
+    ;   pick_pivot_atom(Cleaned, Strategy, Pivot),
+        bullet_eliminate(Cleaned, Pivot, Reduced, NegClauses),
+        dp_solve(Reduced, Strategy, Outcome, SubModel),
         (   Outcome == sat ->
-            Model = [assign(Atom, Val)|SubModel]
-        ;   Model = []
-        )
-    ;   select_atom(Cleaned, Strategy, PivotAtom),
-        bullet_operation(Cleaned, PivotAtom, NextClauses, PosClauses, NegClauses),
-        dp_loop(NextClauses, Strategy, Outcome, SubModel),
-        (   Outcome == sat ->
-            reconstruct_atom_value(PivotAtom, PosClauses, NegClauses, SubModel, PivotVal),
-            Model = [assign(PivotAtom, PivotVal)|SubModel]
+            infer_pivot_value(Pivot, NegClauses, SubModel, PivotValue),
+            Model = [assign(Pivot, PivotValue) | SubModel]
         ;   Model = []
         )
     ).
 
-clean_dp_clauses([], []).
-clean_dp_clauses([C|Cs], Result) :-
-    sort(C, Sorted),
-    (   is_tautology_dp(Sorted) ->
-        clean_dp_clauses(Cs, Result)
-    ;   clean_dp_clauses(Cs, Rest),
-        (   member(Other, Rest), subset(Other, Sorted) ->
-            Result = Rest
-        ;   Result = [Sorted|Rest]
-        )
-    ).
+simplify_clauses(Clauses, Cleaned) :-
+    findall(Sorted,
+        (member(Clause, Clauses), sort(Clause, Sorted), \+ is_tautology(Sorted)),
+        NoTautologies),
+    drop_subsumed(NoTautologies, Cleaned).
 
-is_tautology_dp(Clause) :-
-    member(pos(A), Clause),
-    member(neg(A), Clause),
+drop_subsumed([], []).
+drop_subsumed([Clause | Rest], Cleaned) :-
+    drop_subsumed(Rest, KeptRest),
+    ( member(Other, KeptRest), subset(Other, Clause) -> Cleaned = KeptRest ; Cleaned = [Clause | KeptRest] ).
+
+is_tautology(Clause) :-
+    member(pos(Atom), Clause),
+    member(neg(Atom), Clause),
     !.
 
-find_unit_clause(Clauses, Lit) :-
-    member([Lit], Clauses),
-    !.
-
-apply_unit_literal(Clauses, UnitLit, Result) :-
+propagate_unit(Clauses, UnitLit, Reduced) :-
     opposite_lit(UnitLit, NegUnitLit),
-    apply_unit_each(Clauses, UnitLit, NegUnitLit, Result).
+    findall(Filtered,
+        (member(Clause, Clauses), \+ member(UnitLit, Clause), delete(Clause, NegUnitLit, Filtered)),
+        Reduced).
 
-apply_unit_each([], _, _, []).
-apply_unit_each([C|Cs], UnitLit, NegUnitLit, Rest) :-
-    (   member(UnitLit, C) ->
-        apply_unit_each(Cs, UnitLit, NegUnitLit, Rest)
-    ;   delete(C, NegUnitLit, Filtered),
-        Rest = [Filtered|Rest1],
-        apply_unit_each(Cs, UnitLit, NegUnitLit, Rest1)
-    ).
+opposite_lit(pos(Atom), neg(Atom)).
+opposite_lit(neg(Atom), pos(Atom)).
 
-opposite_lit(pos(A), neg(A)).
-opposite_lit(neg(A), pos(A)).
+lit_assignment(pos(Atom), Atom, true).
+lit_assignment(neg(Atom), Atom, false).
 
-unit_to_assignment(pos(A), A, true).
-unit_to_assignment(neg(A), A, false).
-
-find_pure_literal(Clauses, Lit) :-
-    extract_all_literals(Clauses, Lits),
-    sort(Lits, UniqueLits),
-    member(Lit, UniqueLits),
-    opposite_lit(Lit, NegLit),
-    \+ member(NegLit, UniqueLits),
+find_pure_literal(Clauses, PureLit) :-
+    append(Clauses, AllLits),
+    sort(AllLits, UniqueLits),
+    member(PureLit, UniqueLits),
+    opposite_lit(PureLit, OppositeLit),
+    \+ member(OppositeLit, UniqueLits),
     !.
 
-extract_all_literals([], []).
-extract_all_literals([C|Cs], All) :-
-    extract_all_literals(Cs, Rest),
-    append(C, Rest, All).
-
-apply_pure_literal(Clauses, PureLit, Result) :-
-    exclude(contains_lit(PureLit), Clauses, Result).
-
-contains_lit(Lit, Clause) :-
-    member(Lit, Clause).
-
-select_atom(Clauses, moms, SelectedAtom) :-
-    findall(Len, (member(C, Clauses), length(C, Len), Len > 1), Lens),
-    min_list(Lens, MinLen),
-    findall(C, (member(C, Clauses), length(C, MinLen)), MinClauses),
-    extract_all_atoms(MinClauses, Atoms),
-    sort(Atoms, UniqueAtoms),
-    map_atom_scores(UniqueAtoms, MinClauses, Scored),
-    sort(1, @>=, Scored, [score(_, SelectedAtom)|_]),
+pick_pivot_atom(Clauses, moms, Pivot) :-
+    findall(Len, (member(Clause, Clauses), length(Clause, Len), Len > 1), Lengths),
+    min_list(Lengths, MinLen),
+    findall(Clause, (member(Clause, Clauses), length(Clause, MinLen)), MinClauses),
+    most_frequent_atom(MinClauses, Pivot),
     !.
-select_atom(Clauses, dlis, SelectedAtom) :-
-    extract_all_atoms(Clauses, Atoms),
-    sort(Atoms, UniqueAtoms),
-    map_atom_scores(UniqueAtoms, Clauses, Scored),
-    sort(1, @>=, Scored, [score(_, SelectedAtom)|_]),
+pick_pivot_atom(Clauses, dlis, Pivot) :-
+    most_frequent_atom(Clauses, Pivot),
     !.
-select_atom(Clauses, _, SelectedAtom) :-
-    select_atom(Clauses, moms, SelectedAtom).
+pick_pivot_atom(Clauses, _, Pivot) :-
+    pick_pivot_atom(Clauses, moms, Pivot).
 
-map_atom_scores([], _, []).
-map_atom_scores([A|As], Clauses, [score(Count, A)|Rest]) :-
-    count_atom_occurrences(Clauses, A, Count),
-    map_atom_scores(As, Clauses, Rest).
+most_frequent_atom(Clauses, BestAtom) :-
+    collect_all_atoms(Clauses, Atoms),
+    findall(score(Count, Atom),
+        (   member(Atom, Atoms),
+            findall(Clause,
+                (member(Clause, Clauses), (member(pos(Atom), Clause) ; member(neg(Atom), Clause))),
+                Matching),
+            length(Matching, Count)
+        ),
+        Scored),
+    sort(1, @>=, Scored, [score(_MaxCount, BestAtom) | _]).
 
-count_atom_occurrences([], _, 0).
-count_atom_occurrences([C|Cs], A, Total) :-
-    count_atom_occurrences(Cs, A, RestCount),
-    (   (member(pos(A), C) ; member(neg(A), C)) ->
-        Total is RestCount + 1
-    ;   Total = RestCount
-    ).
+bullet_eliminate(Clauses, Pivot, Reduced, NegClauses) :-
+    findall(Clause, (member(Clause, Clauses), member(pos(Pivot), Clause)), PosClauses),
+    findall(Clause,
+        (member(Clause, Clauses), \+ member(pos(Pivot), Clause), member(neg(Pivot), Clause)),
+        NegClauses),
+    findall(Clause,
+        (member(Clause, Clauses), \+ member(pos(Pivot), Clause), \+ member(neg(Pivot), Clause)),
+        NeutralClauses),
+    findall(CleanResolvent,
+        (   member(PosClause, PosClauses),
+            member(NegClause, NegClauses),
+            delete(PosClause, pos(Pivot), PosRest),
+            delete(NegClause, neg(Pivot), NegRest),
+            append(PosRest, NegRest, RawResolvent),
+            sort(RawResolvent, CleanResolvent),
+            \+ is_tautology(CleanResolvent)
+        ),
+        Resolvents),
+    append(NeutralClauses, Resolvents, Combined),
+    simplify_clauses(Combined, Reduced).
 
-bullet_operation(Clauses, Atom, ResultClauses, PosClauses, NegClauses) :-
-    partition(has_pos_atom(Atom), Clauses, PosClauses, NonPos),
-    partition(has_neg_atom(Atom), NonPos, NegClauses, S0),
-    resolve_bullet(PosClauses, NegClauses, Atom, Resolvents),
-    append(S0, Resolvents, Combined),
-    clean_dp_clauses(Combined, ResultClauses).
-
-has_pos_atom(A, C) :- member(pos(A), C).
-has_neg_atom(A, C) :- member(neg(A), C).
-
-resolve_bullet([], _, _, []).
-resolve_bullet([P|Ps], Negs, Atom, Resolvents) :-
-    resolve_bullet_one(P, Negs, Atom, Res1),
-    resolve_bullet(Ps, Negs, Atom, ResRest),
-    append(Res1, ResRest, Resolvents).
-
-resolve_bullet_one(_, [], _, []).
-resolve_bullet_one(P, [N|Ns], Atom, Result) :-
-    delete(P, pos(Atom), RestP),
-    delete(N, neg(Atom), RestN),
-    append(RestP, RestN, Resolvent),
-    sort(Resolvent, CleanResolvent),
-    (   is_tautology_dp(CleanResolvent) ->
-        resolve_bullet_one(P, Ns, Atom, Result)
-    ;   Result = [CleanResolvent|RestRes],
-        resolve_bullet_one(P, Ns, Atom, RestRes)
-    ).
-
-reconstruct_atom_value(Atom, _, NegClauses, SubModel, Value) :-
-    (   clauses_satisfied(NegClauses, [assign(Atom, true)|SubModel]) ->
+infer_pivot_value(Pivot, NegClauses, SubModel, Value) :-
+    (   forall(member(Clause, NegClauses),
+            (member(Lit, Clause), lit_true_in_model(Lit, [assign(Pivot, true) | SubModel]))) ->
         Value = true
     ;   Value = false
     ).
 
-clauses_satisfied([], _).
-clauses_satisfied([C|Cs], Model) :-
-    clause_satisfied(C, Model),
-    clauses_satisfied(Cs, Model).
+lit_true_in_model(pos(Atom), Model) :- member(assign(Atom, true), Model).
+lit_true_in_model(neg(Atom), Model) :- member(assign(Atom, false), Model).
 
-clause_satisfied(Clause, Model) :-
-    member(Lit, Clause),
-    literal_true_in_model(Lit, Model),
-    !.
+collect_all_atoms(Clauses, UniqueAtoms) :-
+    findall(Atom,
+        (member(Clause, Clauses), (member(pos(Atom), Clause) ; member(neg(Atom), Clause))),
+        RawAtoms),
+    sort(RawAtoms, UniqueAtoms).
 
-literal_true_in_model(pos(A), Model) :-
-    member(assign(A, true), Model).
-literal_true_in_model(neg(A), Model) :-
-    member(assign(A, false), Model).
-
-extract_all_atoms([], []).
-extract_all_atoms([C|Cs], Atoms) :-
-    extract_all_atoms(Cs, Rest),
-    clause_atoms(C, CAtoms),
-    append(CAtoms, Rest, Atoms).
-
-clause_atoms([], []).
-clause_atoms([pos(A)|Ls], [A|Rest]) :- clause_atoms(Ls, Rest).
-clause_atoms([neg(A)|Ls], [A|Rest]) :- clause_atoms(Ls, Rest).
-
-fill_missing_atoms([], Model, Model).
-fill_missing_atoms([A|As], Model0, ModelOut) :-
-    (   member(assign(A, _), Model0) ->
-        fill_missing_atoms(As, Model0, ModelOut)
-    ;   fill_missing_atoms(As, [assign(A, true)|Model0], ModelOut)
-    ).
+fill_missing_atoms(AllAtoms, PartialModel, CompleteModel) :-
+    findall(assign(Atom, true),
+        (member(Atom, AllAtoms), \+ member(assign(Atom, _), PartialModel)),
+        DefaultAssignments),
+    append(PartialModel, DefaultAssignments, CompleteModel).
 
 format_solution(Model, Formatted) :-
     sort(Model, Sorted),
-    findall(Entry,
-        (   member(assign(A, Val), Sorted),
-            format(string(Entry), "~w/~w", [A, Val])
-        ),
-        Entries
-    ),
+    findall(Entry, (member(assign(A, V), Sorted), format(string(Entry), "~w/~w", [A, V])), Entries),
     atomic_list_concat(Entries, '; ', Inner),
     format(string(Formatted), "{~w}", [Inner]).

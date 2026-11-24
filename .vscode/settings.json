@@ -1,0 +1,13 @@
+{
+  "prolog.executablePath": "C:\\Users\\legio\\swipl\\bin\\swipl.exe",
+  "prolog.dialect": "swi",
+  "prolog.syntax.enabled": true,
+  "files.associations": {
+    "*.pl": "prolog",
+    "*.txt": "plaintext"
+  },
+  "python.defaultInterpreterPath": "C:\\Users\\legio\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+  "python.analysis.autoImportCompletions": true,
+  "editor.formatOnSave": true,
+  "terminal.integrated.defaultProfile.windows": "PowerShell"
+}

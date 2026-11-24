@@ -149,9 +149,13 @@ class KRRProjectGUI:
                 
                 self.prop_output.insert(tk.END, f"=== PAȘII DERIVĂRII / TRACE ===\n")
                 if trace_str == "[]" or not trace_str:
-                    self.prop_output.insert(tk.END, "Nicio operație de rezoluție necesară.\n")
-                    self.prop_output.insert(tk.END, "Motiv: Clauza (b or not c) a fost eliminată prin optimizarea de subsumare (C5 p.6),\n")
-                    self.prop_output.insert(tk.END, "fiind subsumată de către clauza unitate not c. Clauzele rămase nu conțin literali complementari.\n")
+                    if ops_str == "0":
+                        self.prop_output.insert(tk.END, "Nicio operație de rezoluție necesară.\n")
+                        self.prop_output.insert(tk.END, "Motiv: Clauzele redundante au fost eliminate prin optimizarea de subsumare (C5 p.6),\n")
+                        self.prop_output.insert(tk.END, "iar clauzele rămase nu conțin literali complementari.\n")
+                    else:
+                        self.prop_output.insert(tk.END, f"Cele {ops_str} operații de rezoluție efectuate au produs doar tautologii sau clauze subsumate,\n")
+                        self.prop_output.insert(tk.END, "care au fost eliminate imediat conform optimizărilor din C5 p.6.\n")
                 else:
                     import re
                     steps = re.findall(r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+),([^)]+)\)\)", trace_str)

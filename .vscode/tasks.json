@@ -1,0 +1,56 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Prolog Tests (main.pl)",
+      "type": "shell",
+      "command": "swipl -s src/main.pl -g \"run_all, halt.\"",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Interactive SWI-Prolog REPL (with main.pl)",
+      "type": "shell",
+      "command": "swipl -s src/main.pl",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Launch GUI (app.py)",
+      "type": "shell",
+      "command": "python gui/app.py",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Generate Report PDF",
+      "type": "shell",
+      "command": "python doc/generate_pdf.py",
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "arthurwang.vsc-prolog",
+    "ms-python.python",
+    "ms-python.debugpy",
+    "charliermarsh.ruff"
+  ]
+}
