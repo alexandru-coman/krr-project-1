@@ -1,6 +1,7 @@
 {
   "prolog.executablePath": "C:\\Users\\legio\\swipl\\bin\\swipl.exe",
   "prolog.dialect": "swi",
+  "prolog.linter.run": "onSave",
   "prolog.syntax.enabled": true,
   "files.associations": {
     "*.pl": "prolog",
