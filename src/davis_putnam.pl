@@ -20,13 +20,13 @@ dp_solve(Clauses, Strategy, Outcome, Model) :-
     ;   member([UnitLit], Cleaned) ->
         propagate_unit(Cleaned, UnitLit, Reduced),
         lit_assignment(UnitLit, Atom, Value),
-        dp_solve(Reduced, Strategy, Outcome, SubModel),
-        ( Outcome == sat -> Model = [assign(Atom, Value) | SubModel] ; Model = [] )
+        Model = [assign(Atom, Value) | SubModel],
+        dp_solve(Reduced, Strategy, Outcome, SubModel)
     ;   find_pure_literal(Cleaned, PureLit) ->
         findall(Clause, (member(Clause, Cleaned), \+ member(PureLit, Clause)), Reduced),
         lit_assignment(PureLit, Atom, Value),
-        dp_solve(Reduced, Strategy, Outcome, SubModel),
-        ( Outcome == sat -> Model = [assign(Atom, Value) | SubModel] ; Model = [] )
+        Model = [assign(Atom, Value) | SubModel],
+        dp_solve(Reduced, Strategy, Outcome, SubModel)
     ;   pick_pivot_atom(Cleaned, Strategy, Pivot),
         bullet_eliminate(Cleaned, Pivot, Reduced, NegClauses),
         dp_solve(Reduced, Strategy, Outcome, SubModel),

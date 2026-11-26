@@ -4,29 +4,22 @@
 
 prove_fol(FilePath, Result, OpsCount, Trace) :-
     parse_kb_file(FilePath, RawClauses),
-    index_and_convert_clauses(RawClauses, Clauses),
-    (   member(clause(_, []), Clauses) ->
-        Result = refutation_success, OpsCount = 0, Trace = [step(0, [], initial_empty_clause)]
-    ;   length(Clauses, MaxId),
-        fol_loop(Clauses, MaxId, [], 0, OpsCount, Result, Trace)
-    ).
+    index_and_convert_clauses(RawClauses, 1, Clauses),
+    length(Clauses, MaxId),
+    fol_loop(Clauses, MaxId, [], 0, OpsCount, Result, Trace).
 
-index_and_convert_clauses(RawClauses, IndexedClauses) :-
-    findall(Converted,
-        (member(Raw, RawClauses), convert_literals(Raw, [], _, Converted), \+ fol_is_tautology(Converted)),
-        Cleaned),
-    index_clauses(Cleaned, 1, IndexedClauses).
-
-index_clauses([], _, []).
-index_clauses([Clause | Rest], Id, [clause(Id, Clause) | RestIndexed]) :-
+index_and_convert_clauses([], _, []).
+index_and_convert_clauses([RawClause | Rest], Id, [clause(Id, PrologClause) | RestIndexed]) :-
+    convert_literals(RawClause, [], _, PrologClause),
     NextId is Id + 1,
-    index_clauses(Rest, NextId, RestIndexed).
+    index_and_convert_clauses(Rest, NextId, RestIndexed).
 
 convert_literals([], VarMap, VarMap, []).
-convert_literals([pos(Formula) | Rest], MapIn, MapOut, [pos(Conv) | ConvRest]) :-
-    convert_term(Formula, MapIn, MapMid, Conv), convert_literals(Rest, MapMid, MapOut, ConvRest).
-convert_literals([neg(Formula) | Rest], MapIn, MapOut, [neg(Conv) | ConvRest]) :-
-    convert_term(Formula, MapIn, MapMid, Conv), convert_literals(Rest, MapMid, MapOut, ConvRest).
+convert_literals([Lit | Rest], MapIn, MapOut, [ConvLit | ConvRest]) :-
+    Lit =.. [Sign, Formula],
+    convert_term(Formula, MapIn, MapMid, ConvFormula),
+    ConvLit =.. [Sign, ConvFormula],
+    convert_literals(Rest, MapMid, MapOut, ConvRest).
 
 convert_term(var(Name), MapIn, MapOut, PrologVar) :- !,
     ( member(Name = PrologVar, MapIn) -> MapOut = MapIn ; MapOut = [Name = PrologVar | MapIn] ).
@@ -51,16 +44,13 @@ fol_loop(Clauses, MaxId, History, OpsSoFar, TotalOps, Result, Trace) :-
     Step = step(NextOps, PrintableResolvent, resolved(Id1, Id2)),
     (   Resolvent == [] ->
         TotalOps = NextOps, Result = refutation_success, Trace = [Step]
-    ;   (fol_is_tautology(Resolvent) ; subsumed_by_existing(Resolvent, Clauses)) ->
+    ;   subsumed_by_existing(Resolvent, Clauses) ->
         fol_loop(Clauses, MaxId, NextHistory, NextOps, TotalOps, Result, Trace)
     ;   NewId is MaxId + 1,
         fol_loop([clause(NewId, Resolvent) | Clauses], NewId, NextHistory, NextOps, TotalOps, Result, RestTrace),
         Trace = [Step | RestTrace]
     ).
 fol_loop(_, _, _, OpsSoFar, OpsSoFar, refutation_failure, []).
-
-fol_is_tautology(Clause) :-
-    member(pos(A), Clause), member(neg(B), Clause), A == B, !.
 
 pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1, Idx2) :-
     findall(pair(Size, I1, I2, Lits1, Lits2, Pos1, Pos2),

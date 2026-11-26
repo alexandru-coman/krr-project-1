@@ -8,37 +8,30 @@ parse_kb_file(FilePath, Clauses) :-
     string_chars(Text, Chars),
     phrase(cnf_formula(Clauses), Chars).
 
-cnf_formula([]) --> spaces, eos, !.
-cnf_formula(Clauses) --> spaces, cnf_clauses(Clauses), spaces.
+cnf_formula([First | Rest]) -->
+    spaces, clause_expr(First), spaces, "and", spaces, !,
+    cnf_formula(Rest).
+cnf_formula([Last]) -->
+    spaces, clause_expr(Last), spaces.
 
-cnf_clauses([First | Rest]) -->
-    clause_expr(First), spaces, "and", spaces, !,
-    cnf_clauses(Rest).
-cnf_clauses([Last]) -->
-    clause_expr(Last).
+clause_expr(Lits) --> "(", spaces, disjunction(Lits), spaces, ")", !.
+clause_expr(Lits) --> disjunction(Lits).
 
-clause_expr([]) --> "[]", !.
-clause_expr([First, Second | Rest]) -->
-    "(", !, spaces, literal(First), spaces, "or", spaces,
-    disjunction_tail(Second, Rest), spaces, ")".
-clause_expr([Single]) -->
-    literal(Single).
-
-disjunction_tail(First, [Next | Rest]) -->
+disjunction([First | Rest]) -->
     literal(First), spaces, "or", spaces, !,
-    disjunction_tail(Next, Rest).
-disjunction_tail(Last, []) -->
+    disjunction(Rest).
+disjunction([Last]) -->
     literal(Last).
 
 literal(neg(Atom)) --> "not", space1, fol_term(Atom), !.
 literal(pos(Atom)) --> fol_term(Atom).
 
 fol_term(Term) -->
-    ident(Functor, false), "(", spaces, args(Args), spaces, ")", !,
+    ident(Functor), "(", spaces, args(Args), spaces, ")", !,
     { Term =.. [Functor | Args] }.
 fol_term(Term) -->
-    ident(Name, IsVar),
-    { IsVar == true -> Term = var(Name) ; Term = Name }.
+    ident(Name),
+    { atom_chars(Name, [C | _]), (char_type(C, upper) -> Term = var(Name) ; Term = Name) }.
 
 args([First | Rest]) -->
     fol_term(First), spaces, ",", spaces, !,
@@ -46,17 +39,12 @@ args([First | Rest]) -->
 args([Last]) -->
     fol_term(Last).
 
-ident(Name, true) -->
-    [C], { char_type(C, upper) }, id_rest(Rest),
+ident(Name) -->
+    [C], { char_type(C, alpha) }, id_rest(Rest),
     { atom_chars(Name, [C | Rest]) }.
-ident(Name, false) -->
-    [C], { char_type(C, lower) }, id_rest(Rest),
-    { atom_chars(Name, [C | Rest]), \+ memberchk(Name, [and, or, not]) }.
 
 id_rest([C | Rest]) --> [C], { char_type(C, alnum) ; C = '_' }, !, id_rest(Rest).
 id_rest([]) --> [].
-
-eos([], []).
 
 space1 --> [C], { char_type(C, space) }, spaces.
 

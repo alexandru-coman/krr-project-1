@@ -37,16 +37,14 @@ C:/Users/legio/Projects/KRR/Project 1/
 
 ---
 
-## 📐 Canonical CNF Input Format
+## 📐 Minimal Input Format
 
-The parser (`src/parser.pl`) enforces **one strict canonical ASCII format** aligned with `Project 1.pdf` and `tests/*.txt` (no syntax aliases or fallbacks):
+The parser (`src/parser.pl`) implements the minimal clean CNF grammar matching `Project 1.pdf` and `tests/*.txt`:
 
-* **Empty KB:** empty or whitespace-only file `""` $\rightarrow$ `[]`.
-* **Clauses (`>= 1`):** joined strictly with `"and"` (whitespace: `' '`, `\t`, `\n`, `\r` allowed around tokens).
-* **Empty clause:** strictly `[]` $\rightarrow$ `[]`.
-* **Multi-literal clause (`>= 2` literals):** strictly parenthesized `(L1 or L2 ...)`, literals joined with `"or"`.
-* **Unit clause (`1` literal):** strictly unparenthesized literal `L` (e.g. `not b`, `e`, `man(socrates)`).
-* **Negation:** strictly `"not "` followed by whitespace (`not a`, `not man(X)`).
+* **Clauses:** joined with `"and"` (whitespace `' '`, `\t`, `\n`, `\r` allowed around tokens).
+* **Multi-literal or parenthesized clauses:** `(L1 or L2 ...)` with literals joined with `"or"`.
+* **Single literals:** `L` (e.g. `not b`, `e`, `man(socrates)`).
+* **Negation:** `"not "` followed by whitespace (`not a`, `not man(X)`).
 * **Identifiers:** lowercase start (`[a-z][a-zA-Z0-9_]*`) for propositions/constants/functors; uppercase start (`[A-Z][a-zA-Z0-9_]*`) for FOL variables (`var(Name)`). Nested FOL terms use `f(arg1, arg2)`.
 * **Internal clause representation:** `[Clause1, Clause2, ...]` where each clause is a list of `pos(Term)` / `neg(Term)` literals.
 
