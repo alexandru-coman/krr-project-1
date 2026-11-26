@@ -211,7 +211,7 @@ class KRRProjectGUI:
         with open(temp_file, "w", encoding="utf-8") as f:
             f.write(formula + "\n")
         try:
-            yield temp_file
+            yield temp_file.replace("'", "\\'")
         finally:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
@@ -247,14 +247,13 @@ class KRRProjectGUI:
         if not formula:
             return
 
-        query_template = (
-            f"{predicate}('{{temp_file}}', Result, Ops, Trace), "
-            "format('RESULT:~w|OPS:~w|TRACE:~w~n', [Result, Ops, Trace]), halt."
-        )
         try:
             with self.temp_formula_file(temp_name, formula) as temp_file:
-                safe_file = temp_file.replace("'", "\\'")
-                p = self.run_swipl(script_name, query_template.format(temp_file=safe_file))
+                query = (
+                    f"{predicate}('{temp_file}', Result, Ops, Trace), "
+                    "format('RESULT:~w|OPS:~w|TRACE:~w~n', [Result, Ops, Trace]), halt."
+                )
+                p = self.run_swipl(script_name, query)
 
             parsed = self.parse_prolog_line(p.stdout, "RESULT:")
             output_widget.delete("1.0", tk.END)
@@ -366,8 +365,7 @@ class KRRProjectGUI:
         )
 
     def query_dp_strategy(self, temp_file, strategy):
-        safe_file = temp_file.replace("'", "\\'")
-        query = f"solve_dp('{safe_file}', {strategy}, Result, Model), format('RES:~w|MODEL:~w~n', [Result, Model]), halt."
+        query = f"solve_dp('{temp_file}', {strategy}, Result, Model), format('RES:~w|MODEL:~w~n', [Result, Model]), halt."
         p = self.run_swipl("davis_putnam.pl", query)
         parsed = self.parse_prolog_line(p.stdout, "RES:")
         if not parsed or "RES" not in parsed or "MODEL" not in parsed:
