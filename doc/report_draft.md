@@ -293,15 +293,11 @@ parse_kb_string(FormulaString, Clauses) :-
 cnf_formula([FirstClause | RestClauses]) -->
     whitespaces, clause_expr(FirstClause), whitespaces, conjunction_op, !,
     cnf_formula(RestClauses).
-cnf_formula([SingleClause]) -->
-    whitespaces, clause_expr(SingleClause), whitespaces.
-cnf_formula([]) -->
-    whitespaces.
+cnf_formula([SingleClause]) --> whitespaces, clause_expr(SingleClause), whitespaces.
+cnf_formula([]) --> whitespaces.
 
 conjunction_op -->
-    whitespaces,
-    ( "and" ; "^" ; "&" ; ";" ; [Newline], { char_type(Newline, newline) } ),
-    whitespaces.
+    whitespaces, ( "and" ; "^" ; "&" ; ";" ; [Char], { char_type(Char, newline) } ), whitespaces.
 
 clause_expr(Literals) --> "(", whitespaces, disjunction_expr(Literals), whitespaces, ")".
 clause_expr(Literals) --> "[", whitespaces, disjunction_expr(Literals), whitespaces, "]".
@@ -310,16 +306,12 @@ clause_expr(Literals) --> disjunction_expr(Literals).
 disjunction_expr([FirstLit | RestLits]) -->
     literal_expr(FirstLit), whitespaces, disjunction_op, !,
     disjunction_expr(RestLits).
-disjunction_expr([SingleLit]) -->
-    literal_expr(SingleLit).
+disjunction_expr([SingleLit]) --> literal_expr(SingleLit).
 
-disjunction_op -->
-    whitespaces, ( "or" ; "v" ; "|" ; "," ), whitespaces.
+disjunction_op --> whitespaces, ( "or" ; "v" ; "|" ; "," ), whitespaces.
 
-literal_expr(neg(Predicate)) -->
-    negation_prefix, whitespaces, fol_term(Predicate).
-literal_expr(pos(Predicate)) -->
-    fol_term(Predicate).
+literal_expr(neg(Predicate)) --> negation_prefix, whitespaces, fol_term(Predicate).
+literal_expr(pos(Predicate)) --> fol_term(Predicate).
 
 negation_prefix --> "not", whitespaces.
 negation_prefix --> ['\u00AC'] ; "¬" ; "~" ; "-".
@@ -334,8 +326,7 @@ fol_term(Term) -->
 arg_list([FirstArg | RestArgs]) -->
     fol_term(FirstArg), whitespaces, ",", whitespaces, !,
     arg_list(RestArgs).
-arg_list([SingleArg]) -->
-    fol_term(SingleArg).
+arg_list([SingleArg]) --> fol_term(SingleArg).
 
 identifier(Name, true) -->
     [First], { char_type(First, upper) ; First = '_' }, id_rest(Rest),
@@ -374,24 +365,17 @@ prove_propositional(Input, Result, OpsCount, Trace) :-
     ).
 
 preprocess_clauses(RawClauses, IndexedClauses) :-
-    findall(SortedClause,
-        (member(Raw, RawClauses), sort(Raw, SortedClause), \+ is_tautology(SortedClause)),
-        Cleaned),
+    findall(Sorted, (member(Raw, RawClauses), sort(Raw, Sorted), \+ is_tautology(Sorted)), Cleaned),
     drop_subsumed(Cleaned, Filtered),
     index_clauses(Filtered, 1, IndexedClauses).
 
 is_tautology(Clause) :-
-    member(pos(Atom), Clause),
-    member(neg(Atom), Clause),
-    !.
+    member(pos(Atom), Clause), member(neg(Atom), Clause), !.
 
 drop_subsumed([], []).
 drop_subsumed([Clause | Rest], Filtered) :-
     drop_subsumed(Rest, KeptRest),
-    (   member(Other, KeptRest), subset(Other, Clause) ->
-        Filtered = KeptRest
-    ;   Filtered = [Clause | KeptRest]
-    ).
+    ( member(Other, KeptRest), subset(Other, Clause) -> Filtered = KeptRest ; Filtered = [Clause | KeptRest] ).
 
 index_clauses([], _, []).
 index_clauses([Clause | Rest], Id, [clause(Id, Clause) | RestIndexed]) :-
@@ -399,8 +383,7 @@ index_clauses([Clause | Rest], Id, [clause(Id, Clause) | RestIndexed]) :-
     index_clauses(Rest, NextId, RestIndexed).
 
 prop_loop(Clauses, MaxId, History, OpsSoFar, TotalOps, Result, Trace) :-
-    pick_shortest_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Pivot),
-    !,
+    pick_shortest_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Pivot), !,
     resolve_on_pivot(Clause1, Clause2, Pivot, Resolvent),
     NextOps is OpsSoFar + 1,
     opposite_lit(Pivot, NegPivot),
@@ -421,12 +404,8 @@ prop_loop(_, _, _, OpsSoFar, OpsSoFar, refutation_failure, []).
 
 pick_shortest_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Pivot) :-
     findall(pair(Size, I1, I2, Lits1, Lits2, Lit),
-        (   member(clause(I1, Lits1), Clauses),
-            member(clause(I2, Lits2), Clauses),
-            I1 < I2,
-            member(Lit, Lits1),
-            opposite_lit(Lit, NegLit),
-            member(NegLit, Lits2),
+        (   member(clause(I1, Lits1), Clauses), member(clause(I2, Lits2), Clauses), I1 < I2,
+            member(Lit, Lits1), opposite_lit(Lit, NegLit), member(NegLit, Lits2),
             \+ member(resolved(I1, I2, Lit), History),
             length(Lits1, Len1), length(Lits2, Len2), Size is Len1 + Len2
         ),
@@ -436,8 +415,7 @@ pick_shortest_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Pivot) :-
 
 resolve_on_pivot(Clause1, Clause2, Pivot, Resolvent) :-
     opposite_lit(Pivot, NegPivot),
-    delete(Clause1, Pivot, Rest1),
-    delete(Clause2, NegPivot, Rest2),
+    delete(Clause1, Pivot, Rest1), delete(Clause2, NegPivot, Rest2),
     append(Rest1, Rest2, Combined),
     sort(Combined, Resolvent).
 
@@ -445,9 +423,7 @@ opposite_lit(pos(Atom), neg(Atom)).
 opposite_lit(neg(Atom), pos(Atom)).
 
 subsumed_by_any(Resolvent, Clauses) :-
-    member(clause(_, Existing), Clauses),
-    subset(Existing, Resolvent),
-    !.
+    member(clause(_, Existing), Clauses), subset(Existing, Resolvent), !.
 ```
 
 ### 5.3. `src/resolution_fol.pl`
@@ -480,18 +456,13 @@ index_and_convert_clauses([RawClause | Rest], Id, [clause(Id, PrologClause) | Re
 
 convert_literals([], VarMap, VarMap, []).
 convert_literals([pos(Formula) | Rest], MapIn, MapOut, [pos(Conv) | ConvRest]) :-
-    convert_term(Formula, MapIn, MapMid, Conv),
-    convert_literals(Rest, MapMid, MapOut, ConvRest).
+    convert_term(Formula, MapIn, MapMid, Conv), convert_literals(Rest, MapMid, MapOut, ConvRest).
 convert_literals([neg(Formula) | Rest], MapIn, MapOut, [neg(Conv) | ConvRest]) :-
-    convert_term(Formula, MapIn, MapMid, Conv),
-    convert_literals(Rest, MapMid, MapOut, ConvRest).
+    convert_term(Formula, MapIn, MapMid, Conv), convert_literals(Rest, MapMid, MapOut, ConvRest).
 
-convert_term(var(Name), MapIn, MapOut, PrologVar) :-
-    !,
+convert_term(var(Name), MapIn, MapOut, PrologVar) :- !,
     ( member(Name = PrologVar, MapIn) -> MapOut = MapIn ; MapOut = [Name = PrologVar | MapIn] ).
-convert_term(Compound, MapIn, MapOut, Converted) :-
-    compound(Compound),
-    !,
+convert_term(Compound, MapIn, MapOut, Converted) :- compound(Compound), !,
     Compound =.. [Functor | RawArgs],
     convert_terms(RawArgs, MapIn, MapOut, ConvArgs),
     Converted =.. [Functor | ConvArgs].
@@ -499,21 +470,16 @@ convert_term(Constant, VarMap, VarMap, Constant).
 
 convert_terms([], VarMap, VarMap, []).
 convert_terms([Arg | Rest], MapIn, MapOut, [ConvArg | ConvRest]) :-
-    convert_term(Arg, MapIn, MapMid, ConvArg),
-    convert_terms(Rest, MapMid, MapOut, ConvRest).
+    convert_term(Arg, MapIn, MapMid, ConvArg), convert_terms(Rest, MapMid, MapOut, ConvRest).
 
 fol_loop(Clauses, MaxId, History, OpsSoFar, TotalOps, Result, Trace) :-
-    pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1, Idx2),
-    !,
-    copy_term(Clause1, Fresh1),
-    copy_term(Clause2, Fresh2),
-    nth1(Idx1, Fresh1, Lit1),
-    nth1(Idx2, Fresh2, Lit2),
+    pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1, Idx2), !,
+    copy_term(Clause1, Fresh1), copy_term(Clause2, Fresh2),
+    nth1(Idx1, Fresh1, Lit1), nth1(Idx2, Fresh2, Lit2),
     resolve_and_factor(Fresh1, Fresh2, Lit1, Lit2, Resolvent),
     NextOps is OpsSoFar + 1,
     NextHistory = [resolved(Id1, Id2, Idx1, Idx2) | History],
-    copy_term(Resolvent, PrintableResolvent),
-    numbervars(PrintableResolvent, 0, _),
+    copy_term(Resolvent, PrintableResolvent), numbervars(PrintableResolvent, 0, _),
     Step = step(NextOps, PrintableResolvent, resolved(Id1, Id2)),
     (   Resolvent == [] ->
         TotalOps = NextOps, Result = refutation_success, Trace = [Step]
@@ -527,11 +493,8 @@ fol_loop(_, _, _, OpsSoFar, OpsSoFar, refutation_failure, []).
 
 pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1, Idx2) :-
     findall(pair(Size, I1, I2, Lits1, Lits2, Pos1, Pos2),
-        (   member(clause(I1, Lits1), Clauses),
-            member(clause(I2, Lits2), Clauses),
-            I1 < I2,
-            nth1(Pos1, Lits1, Lit1),
-            nth1(Pos2, Lits2, Lit2),
+        (   member(clause(I1, Lits1), Clauses), member(clause(I2, Lits2), Clauses), I1 < I2,
+            nth1(Pos1, Lits1, Lit1), nth1(Pos2, Lits2, Lit2),
             can_unify_opposite(Lit1, Lit2),
             \+ member(resolved(I1, I2, Pos1, Pos2), History),
             length(Lits1, Len1), length(Lits2, Len2), Size is Len1 + Len2
@@ -540,30 +503,27 @@ pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1,
     Candidates \== [],
     sort(1, @=<, Candidates, [pair(_, Id1, Id2, Clause1, Clause2, Idx1, Idx2) | _]).
 
-can_unify_opposite(pos(Atom1), neg(Atom2)) :-
+can_unify_opposite(Lit1, Lit2) :-
+    opposite_atoms(Lit1, Lit2, Atom1, Atom2),
     \+ \+ (copy_term(Atom1, Fresh1), copy_term(Atom2, Fresh2), Fresh1 = Fresh2).
-can_unify_opposite(neg(Atom1), pos(Atom2)) :-
-    \+ \+ (copy_term(Atom1, Fresh1), copy_term(Atom2, Fresh2), Fresh1 = Fresh2).
+
+opposite_atoms(pos(Atom1), neg(Atom2), Atom1, Atom2).
+opposite_atoms(neg(Atom1), pos(Atom2), Atom1, Atom2).
 
 resolve_and_factor(Clause1, Clause2, Lit1, Lit2, Resolvent) :-
-    unify_atoms(Lit1, Lit2),
-    remove_exact(Clause1, Lit1, Rest1),
-    remove_exact(Clause2, Lit2, Rest2),
+    opposite_atoms(Lit1, Lit2, Atom1, Atom2), Atom1 = Atom2,
+    remove_exact(Clause1, Lit1, Rest1), remove_exact(Clause2, Lit2, Rest2),
     append(Rest1, Rest2, Combined),
     factor_duplicates(Combined, Resolvent).
-
-unify_atoms(pos(Atom1), neg(Atom2)) :- Atom1 = Atom2.
-unify_atoms(neg(Atom1), pos(Atom2)) :- Atom1 = Atom2.
 
 remove_exact([First | Rest], Target, Rest) :- First == Target, !.
 remove_exact([First | Rest], Target, [First | FilteredRest]) :- remove_exact(Rest, Target, FilteredRest).
 
 factor_duplicates([], []).
 factor_duplicates([Lit | Rest], UniqueLits) :-
-    (   member(Other, Rest), Lit == Other ->
+    ( member(Other, Rest), Lit == Other ->
         factor_duplicates(Rest, UniqueLits)
-    ;   UniqueLits = [Lit | RestUnique],
-        factor_duplicates(Rest, RestUnique)
+    ;   UniqueLits = [Lit | RestUnique], factor_duplicates(Rest, RestUnique)
     ).
 
 subsumed_by_existing(Resolvent, Clauses) :-
@@ -573,8 +533,7 @@ subsumed_by_existing(Resolvent, Clauses) :-
         copy_term(Resolvent, FreshResolvent),
         numbervars(FreshResolvent, 0, _),
         subset(FreshExisting, FreshResolvent)
-    ),
-    !.
+    ), !.
 ```
 
 ### 5.4. `src/davis_putnam.pl`
@@ -596,8 +555,7 @@ solve_dp(Input, Strategy, Result, ModelFormatted) :-
         Result = 'YES',
         fill_missing_atoms(AllAtoms, PartialModel, CompleteModel),
         format_solution(CompleteModel, ModelFormatted)
-    ;   Result = 'NOT',
-        ModelFormatted = '{}'
+    ;   Result = 'NOT', ModelFormatted = '{}'
     ).
 
 solve_dp(Input, Strategy, Result) :- solve_dp(Input, Strategy, Result, _).
@@ -605,10 +563,8 @@ solve_dp(Input, Result) :- solve_dp(Input, moms, Result, _).
 
 dp_solve(Clauses, Strategy, Outcome, Model) :-
     simplify_clauses(Clauses, Cleaned),
-    (   member([], Cleaned) ->
-        Outcome = unsat, Model = []
-    ;   Cleaned == [] ->
-        Outcome = sat, Model = []
+    (   member([], Cleaned) -> Outcome = unsat, Model = []
+    ;   Cleaned == [] -> Outcome = sat, Model = []
     ;   member([UnitLit], Cleaned) ->
         propagate_unit(Cleaned, UnitLit, Reduced),
         lit_assignment(UnitLit, Atom, Value),
@@ -622,28 +578,22 @@ dp_solve(Clauses, Strategy, Outcome, Model) :-
     ;   pick_pivot_atom(Cleaned, Strategy, Pivot),
         bullet_eliminate(Cleaned, Pivot, Reduced, NegClauses),
         dp_solve(Reduced, Strategy, Outcome, SubModel),
-        (   Outcome == sat ->
+        ( Outcome == sat ->
             infer_pivot_value(Pivot, NegClauses, SubModel, PivotValue),
             Model = [assign(Pivot, PivotValue) | SubModel]
-        ;   Model = []
-        )
+        ;   Model = [] )
     ).
 
 simplify_clauses(Clauses, Cleaned) :-
-    findall(Sorted,
-        (member(Clause, Clauses), sort(Clause, Sorted), \+ is_tautology(Sorted)),
-        NoTautologies),
-    drop_subsumed(NoTautologies, Cleaned).
+    findall(Sorted, (member(Clause, Clauses), sort(Clause, Sorted), \+ is_tautology(Sorted)), NoTaut),
+    drop_subsumed(NoTaut, Cleaned).
 
 drop_subsumed([], []).
 drop_subsumed([Clause | Rest], Cleaned) :-
     drop_subsumed(Rest, KeptRest),
     ( member(Other, KeptRest), subset(Other, Clause) -> Cleaned = KeptRest ; Cleaned = [Clause | KeptRest] ).
 
-is_tautology(Clause) :-
-    member(pos(Atom), Clause),
-    member(neg(Atom), Clause),
-    !.
+is_tautology(Clause) :- member(pos(Atom), Clause), member(neg(Atom), Clause), !.
 
 propagate_unit(Clauses, UnitLit, Reduced) :-
     opposite_lit(UnitLit, NegUnitLit),
@@ -658,22 +608,18 @@ lit_assignment(pos(Atom), Atom, true).
 lit_assignment(neg(Atom), Atom, false).
 
 find_pure_literal(Clauses, PureLit) :-
-    append(Clauses, AllLits),
-    sort(AllLits, UniqueLits),
+    append(Clauses, AllLits), sort(AllLits, UniqueLits),
     member(PureLit, UniqueLits),
     opposite_lit(PureLit, OppositeLit),
-    \+ member(OppositeLit, UniqueLits),
-    !.
+    \+ member(OppositeLit, UniqueLits), !.
 
 pick_pivot_atom(Clauses, moms, Pivot) :-
     findall(Len, (member(Clause, Clauses), length(Clause, Len), Len > 1), Lengths),
     min_list(Lengths, MinLen),
     findall(Clause, (member(Clause, Clauses), length(Clause, MinLen)), MinClauses),
-    most_frequent_atom(MinClauses, Pivot),
-    !.
+    most_frequent_atom(MinClauses, Pivot), !.
 pick_pivot_atom(Clauses, dlis, Pivot) :-
-    most_frequent_atom(Clauses, Pivot),
-    !.
+    most_frequent_atom(Clauses, Pivot), !.
 pick_pivot_atom(Clauses, _, Pivot) :-
     pick_pivot_atom(Clauses, moms, Pivot).
 
@@ -681,29 +627,20 @@ most_frequent_atom(Clauses, BestAtom) :-
     collect_all_atoms(Clauses, Atoms),
     findall(score(Count, Atom),
         (   member(Atom, Atoms),
-            findall(Clause,
-                (member(Clause, Clauses), (member(pos(Atom), Clause) ; member(neg(Atom), Clause))),
-                Matching),
-            length(Matching, Count)
+            findall(C, (member(C, Clauses), (member(pos(Atom), C) ; member(neg(Atom), C))), Hits),
+            length(Hits, Count)
         ),
         Scored),
     sort(1, @>=, Scored, [score(_MaxCount, BestAtom) | _]).
 
 bullet_eliminate(Clauses, Pivot, Reduced, NegClauses) :-
-    findall(Clause, (member(Clause, Clauses), member(pos(Pivot), Clause)), PosClauses),
-    findall(Clause,
-        (member(Clause, Clauses), \+ member(pos(Pivot), Clause), member(neg(Pivot), Clause)),
-        NegClauses),
-    findall(Clause,
-        (member(Clause, Clauses), \+ member(pos(Pivot), Clause), \+ member(neg(Pivot), Clause)),
-        NeutralClauses),
+    findall(C, (member(C, Clauses), member(pos(Pivot), C)), PosClauses),
+    findall(C, (member(C, Clauses), \+ member(pos(Pivot), C), member(neg(Pivot), C)), NegClauses),
+    findall(C, (member(C, Clauses), \+ member(pos(Pivot), C), \+ member(neg(Pivot), C)), NeutralClauses),
     findall(CleanResolvent,
-        (   member(PosClause, PosClauses),
-            member(NegClause, NegClauses),
-            delete(PosClause, pos(Pivot), PosRest),
-            delete(NegClause, neg(Pivot), NegRest),
-            append(PosRest, NegRest, RawResolvent),
-            sort(RawResolvent, CleanResolvent),
+        (   member(PosClause, PosClauses), member(NegClause, NegClauses),
+            delete(PosClause, pos(Pivot), PosRest), delete(NegClause, neg(Pivot), NegRest),
+            append(PosRest, NegRest, Raw), sort(Raw, CleanResolvent),
             \+ is_tautology(CleanResolvent)
         ),
         Resolvents),
@@ -721,9 +658,7 @@ lit_true_in_model(pos(Atom), Model) :- member(assign(Atom, true), Model).
 lit_true_in_model(neg(Atom), Model) :- member(assign(Atom, false), Model).
 
 collect_all_atoms(Clauses, UniqueAtoms) :-
-    findall(Atom,
-        (member(Clause, Clauses), (member(pos(Atom), Clause) ; member(neg(Atom), Clause))),
-        RawAtoms),
+    findall(Atom, (member(C, Clauses), (member(pos(Atom), C) ; member(neg(Atom), C))), RawAtoms),
     sort(RawAtoms, UniqueAtoms).
 
 fill_missing_atoms(AllAtoms, PartialModel, CompleteModel) :-

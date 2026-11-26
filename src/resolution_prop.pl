@@ -19,24 +19,17 @@ prove_propositional(Input, Result, OpsCount, Trace) :-
     ).
 
 preprocess_clauses(RawClauses, IndexedClauses) :-
-    findall(SortedClause,
-        (member(Raw, RawClauses), sort(Raw, SortedClause), \+ is_tautology(SortedClause)),
-        Cleaned),
+    findall(Sorted, (member(Raw, RawClauses), sort(Raw, Sorted), \+ is_tautology(Sorted)), Cleaned),
     drop_subsumed(Cleaned, Filtered),
     index_clauses(Filtered, 1, IndexedClauses).
 
 is_tautology(Clause) :-
-    member(pos(Atom), Clause),
-    member(neg(Atom), Clause),
-    !.
+    member(pos(Atom), Clause), member(neg(Atom), Clause), !.
 
 drop_subsumed([], []).
 drop_subsumed([Clause | Rest], Filtered) :-
     drop_subsumed(Rest, KeptRest),
-    (   member(Other, KeptRest), subset(Other, Clause) ->
-        Filtered = KeptRest
-    ;   Filtered = [Clause | KeptRest]
-    ).
+    ( member(Other, KeptRest), subset(Other, Clause) -> Filtered = KeptRest ; Filtered = [Clause | KeptRest] ).
 
 index_clauses([], _, []).
 index_clauses([Clause | Rest], Id, [clause(Id, Clause) | RestIndexed]) :-
@@ -44,8 +37,7 @@ index_clauses([Clause | Rest], Id, [clause(Id, Clause) | RestIndexed]) :-
     index_clauses(Rest, NextId, RestIndexed).
 
 prop_loop(Clauses, MaxId, History, OpsSoFar, TotalOps, Result, Trace) :-
-    pick_shortest_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Pivot),
-    !,
+    pick_shortest_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Pivot), !,
     resolve_on_pivot(Clause1, Clause2, Pivot, Resolvent),
     NextOps is OpsSoFar + 1,
     opposite_lit(Pivot, NegPivot),
@@ -66,12 +58,8 @@ prop_loop(_, _, _, OpsSoFar, OpsSoFar, refutation_failure, []).
 
 pick_shortest_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Pivot) :-
     findall(pair(Size, I1, I2, Lits1, Lits2, Lit),
-        (   member(clause(I1, Lits1), Clauses),
-            member(clause(I2, Lits2), Clauses),
-            I1 < I2,
-            member(Lit, Lits1),
-            opposite_lit(Lit, NegLit),
-            member(NegLit, Lits2),
+        (   member(clause(I1, Lits1), Clauses), member(clause(I2, Lits2), Clauses), I1 < I2,
+            member(Lit, Lits1), opposite_lit(Lit, NegLit), member(NegLit, Lits2),
             \+ member(resolved(I1, I2, Lit), History),
             length(Lits1, Len1), length(Lits2, Len2), Size is Len1 + Len2
         ),
@@ -81,8 +69,7 @@ pick_shortest_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Pivot) :-
 
 resolve_on_pivot(Clause1, Clause2, Pivot, Resolvent) :-
     opposite_lit(Pivot, NegPivot),
-    delete(Clause1, Pivot, Rest1),
-    delete(Clause2, NegPivot, Rest2),
+    delete(Clause1, Pivot, Rest1), delete(Clause2, NegPivot, Rest2),
     append(Rest1, Rest2, Combined),
     sort(Combined, Resolvent).
 
@@ -90,6 +77,4 @@ opposite_lit(pos(Atom), neg(Atom)).
 opposite_lit(neg(Atom), pos(Atom)).
 
 subsumed_by_any(Resolvent, Clauses) :-
-    member(clause(_, Existing), Clauses),
-    subset(Existing, Resolvent),
-    !.
+    member(clause(_, Existing), Clauses), subset(Existing, Resolvent), !.
