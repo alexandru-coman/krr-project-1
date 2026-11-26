@@ -161,7 +161,7 @@ def build_pdf():
         ["Own Example", "Academic graduation entitlement", "refutation_success", "10"],
         ["C3 p.30", "Socrates mortality (¬man(X) or mortal(X))...", "refutation_success", "2"],
         ["C3 p.33", "Animal lover & killer contradiction...", "refutation_success", "3"],
-        ["C4 p.12", "Barber paradox (¬person(X) or shaves...)", "refutation_success", "5"]
+        ["C4 p.12", "Barber paradox (¬person(X) or shaves...)", "refutation_success", "3"]
     ]
     t_fol = make_table(fol_table_data, [80, 230, 110, 60], 8, [('ALIGN', (2, 0), (-1, -1), 'CENTER')])
     story.append(t_fol)

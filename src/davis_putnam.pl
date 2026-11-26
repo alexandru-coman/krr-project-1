@@ -31,8 +31,11 @@ dp_solve(Clauses, Strategy, Outcome, Model) :-
         bullet_eliminate(Cleaned, Pivot, Reduced, NegClauses),
         dp_solve(Reduced, Strategy, Outcome, SubModel),
         ( Outcome == sat ->
-            infer_pivot_value(Pivot, NegClauses, SubModel, PivotValue),
-            Model = [assign(Pivot, PivotValue) | SubModel]
+            collect_all_atoms(Cleaned, CleanedAtoms),
+            subtract(CleanedAtoms, [Pivot], OtherAtoms),
+            fill_missing_atoms(OtherAtoms, SubModel, ExtSubModel),
+            infer_pivot_value(Pivot, NegClauses, ExtSubModel, PivotValue),
+            Model = [assign(Pivot, PivotValue) | ExtSubModel]
         ;   Model = [] )
     ).
 

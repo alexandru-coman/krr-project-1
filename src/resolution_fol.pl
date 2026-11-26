@@ -8,8 +8,7 @@ prove_fol(FilePath, Result, OpsCount, Trace) :-
     (   member(clause(_, []), Clauses) ->
         Result = refutation_success, OpsCount = 0, Trace = [step(0, [], 'Initial empty clause')]
     ;   length(Clauses, MaxId),
-        fol_loop(Clauses, MaxId, [], 0, OpsCount, Result, RevTrace),
-        reverse(RevTrace, Trace)
+        fol_loop(Clauses, MaxId, [], 0, OpsCount, Result, Trace)
     ).
 
 index_and_convert_clauses([], _, []).
@@ -37,17 +36,16 @@ convert_terms([Arg | Rest], MapIn, MapOut, [ConvArg | ConvRest]) :-
     convert_term(Arg, MapIn, MapMid, ConvArg), convert_terms(Rest, MapMid, MapOut, ConvRest).
 
 fol_loop(Clauses, MaxId, History, OpsSoFar, TotalOps, Result, Trace) :-
-    pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1, Idx2), !,
-    copy_term(Clause1, Fresh1), copy_term(Clause2, Fresh2),
-    nth1(Idx1, Fresh1, Lit1), nth1(Idx2, Fresh2, Lit2),
-    resolve_and_factor(Fresh1, Fresh2, Lit1, Lit2, Resolvent),
+    pick_next_step(Clauses, History, Action), !,
+    apply_step(Action, Resolvent, StepTag),
     NextOps is OpsSoFar + 1,
-    NextHistory = [resolved(Id1, Id2, Idx1, Idx2) | History],
+    step_history_entry(Action, HistEntry),
+    NextHistory = [HistEntry | History],
     copy_term(Resolvent, PrintableResolvent), numbervars(PrintableResolvent, 0, _),
-    Step = step(NextOps, PrintableResolvent, resolved(Id1, Id2)),
+    Step = step(NextOps, PrintableResolvent, StepTag),
     (   Resolvent == [] ->
         TotalOps = NextOps, Result = refutation_success, Trace = [Step]
-    ;   subsumed_by_existing(Resolvent, Clauses) ->
+    ;   (fol_is_tautology(Resolvent) ; subsumed_by_existing(Resolvent, Clauses)) ->
         fol_loop(Clauses, MaxId, NextHistory, NextOps, TotalOps, Result, Trace)
     ;   NewId is MaxId + 1,
         fol_loop([clause(NewId, Resolvent) | Clauses], NewId, NextHistory, NextOps, TotalOps, Result, RestTrace),
@@ -55,33 +53,63 @@ fol_loop(Clauses, MaxId, History, OpsSoFar, TotalOps, Result, Trace) :-
     ).
 fol_loop(_, _, _, OpsSoFar, OpsSoFar, refutation_failure, []).
 
-pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1, Idx2) :-
-    findall(pair(Size, I1, I2, Lits1, Lits2, Pos1, Pos2),
+pick_next_step(Clauses, History, Action) :-
+    findall(cand(Size, 1, resolve(I1, I2, Lits1, Lits2, Pos1, Pos2)),
         (   member(clause(I1, Lits1), Clauses), member(clause(I2, Lits2), Clauses), I1 < I2,
             nth1(Pos1, Lits1, Lit1), nth1(Pos2, Lits2, Lit2),
             can_unify_opposite(Lit1, Lit2),
             \+ member(resolved(I1, I2, Pos1, Pos2), History),
             length(Lits1, Len1), length(Lits2, Len2), Size is Len1 + Len2
         ),
-        Candidates),
-    Candidates \== [],
-    sort(1, @=<, Candidates, [pair(_, Id1, Id2, Clause1, Clause2, Idx1, Idx2) | _]).
+        ResCands),
+    findall(cand(Size, 2, factor(Id, Lits, Pos1, Pos2)),
+        (   member(clause(Id, Lits), Clauses),
+            nth1(Pos1, Lits, Lit1), nth1(Pos2, Lits, Lit2), Pos1 < Pos2,
+            can_unify_same(Lit1, Lit2),
+            \+ member(factored(Id, Pos1, Pos2), History),
+            length(Lits, Len), Size is Len * 2
+        ),
+        FacCands),
+    append(ResCands, FacCands, AllCands),
+    AllCands \== [],
+    sort(0, @=<, AllCands, [cand(_, _, Action) | _]).
+
+apply_step(resolve(Id1, Id2, Clause1, Clause2, Idx1, Idx2), Resolvent, resolved(Id1, Id2)) :-
+    copy_term(Clause1, Fresh1), copy_term(Clause2, Fresh2),
+    nth1(Idx1, Fresh1, Lit1), nth1(Idx2, Fresh2, Lit2),
+    opposite_atoms(Lit1, Lit2, Atom1, Atom2),
+    unify_with_occurs_check(Atom1, Atom2),
+    remove_nth1(Idx1, Fresh1, Rest1), remove_nth1(Idx2, Fresh2, Rest2),
+    append(Rest1, Rest2, Combined),
+    factor_duplicates(Combined, Resolvent).
+apply_step(factor(Id, Clause, Idx1, Idx2), Factored, factored(Id)) :-
+    copy_term(Clause, Fresh),
+    nth1(Idx1, Fresh, Lit1), nth1(Idx2, Fresh, Lit2),
+    same_atoms(Lit1, Lit2, Atom1, Atom2),
+    unify_with_occurs_check(Atom1, Atom2),
+    remove_nth1(Idx2, Fresh, Stripped),
+    factor_duplicates(Stripped, Factored).
+
+step_history_entry(resolve(I1, I2, _, _, P1, P2), resolved(I1, I2, P1, P2)).
+step_history_entry(factor(Id, _, P1, P2), factored(Id, P1, P2)).
 
 can_unify_opposite(Lit1, Lit2) :-
     opposite_atoms(Lit1, Lit2, Atom1, Atom2),
-    \+ \+ (copy_term(Atom1, Fresh1), copy_term(Atom2, Fresh2), Fresh1 = Fresh2).
+    \+ \+ (copy_term(Atom1, Fresh1), copy_term(Atom2, Fresh2), unify_with_occurs_check(Fresh1, Fresh2)).
+
+can_unify_same(Lit1, Lit2) :-
+    same_atoms(Lit1, Lit2, Atom1, Atom2),
+    \+ \+ (copy_term(Atom1, Fresh1), copy_term(Atom2, Fresh2), unify_with_occurs_check(Fresh1, Fresh2)).
 
 opposite_atoms(pos(Atom1), neg(Atom2), Atom1, Atom2).
 opposite_atoms(neg(Atom1), pos(Atom2), Atom1, Atom2).
 
-resolve_and_factor(Clause1, Clause2, Lit1, Lit2, Resolvent) :-
-    opposite_atoms(Lit1, Lit2, Atom1, Atom2), Atom1 = Atom2,
-    remove_exact(Clause1, Lit1, Rest1), remove_exact(Clause2, Lit2, Rest2),
-    append(Rest1, Rest2, Combined),
-    factor_duplicates(Combined, Resolvent).
+same_atoms(pos(Atom1), pos(Atom2), Atom1, Atom2).
+same_atoms(neg(Atom1), neg(Atom2), Atom1, Atom2).
 
-remove_exact([First | Rest], Target, Rest) :- First == Target, !.
-remove_exact([First | Rest], Target, [First | FilteredRest]) :- remove_exact(Rest, Target, FilteredRest).
+remove_nth1(1, [_ | Rest], Rest) :- !.
+remove_nth1(N, [First | Rest], [First | FilteredRest]) :-
+    N > 1, Next is N - 1, remove_nth1(Next, Rest, FilteredRest).
 
 factor_duplicates([], []).
 factor_duplicates([Lit | Rest], UniqueLits) :-
@@ -90,11 +118,22 @@ factor_duplicates([Lit | Rest], UniqueLits) :-
     ;   UniqueLits = [Lit | RestUnique], factor_duplicates(Rest, RestUnique)
     ).
 
+fol_is_tautology(Clause) :-
+    member(pos(A), Clause), member(neg(B), Clause), A == B, !.
+
 subsumed_by_existing(Resolvent, Clauses) :-
+    length(Resolvent, LenR),
     member(clause(_, Existing), Clauses),
+    length(Existing, LenE), LenE =< LenR,
     \+ \+ (
         copy_term(Existing, FreshExisting),
         copy_term(Resolvent, FreshResolvent),
         numbervars(FreshResolvent, 0, _),
-        subset(FreshExisting, FreshResolvent)
+        subsumes_lits(FreshExisting, FreshResolvent)
     ), !.
+
+subsumes_lits([], _).
+subsumes_lits([Lit | Rest], Target) :-
+    member(Other, Target),
+    unify_with_occurs_check(Lit, Other),
+    subsumes_lits(Rest, Target).

@@ -135,7 +135,7 @@ The First-Order Logic resolution procedure was implemented in SWI-Prolog (`resol
 4. **Course Example 3 (C4 p.12 Barber Paradox):**
    * Formula: $(\neg \text{person}(X) \lor \text{shaves}(\text{barber}, X) \lor \text{shaves}(X, X)) \land (\neg \text{person}(Y) \lor \neg \text{shaves}(\text{barber}, Y) \lor \neg \text{shaves}(Y, Y)) \land \text{person}(\text{barber})$
    * Result: `refutation_success`
-   * Number of resolution operations performed: **5 operations**
+   * Number of resolution operations performed: **3 operations**
 
 ---
 

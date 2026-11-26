@@ -167,11 +167,18 @@ class KRRProjectGUI:
             ops_lbl = ttk.Label(info_bar, text="Resolution Operations: -", font=("Segoe UI", 10))
             ops_lbl.pack(side=tk.LEFT, padx=20)
 
-        output_text = tk.Text(res_frame, wrap=tk.NONE, font=("Consolas", 10))
-        output_text.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
-        scroll_y = ttk.Scrollbar(res_frame, orient=tk.VERTICAL, command=output_text.yview)
-        scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
-        output_text.config(yscrollcommand=scroll_y.set)
+        out_frame = ttk.Frame(res_frame)
+        out_frame.pack(fill=tk.BOTH, expand=True)
+        out_frame.rowconfigure(0, weight=1)
+        out_frame.columnconfigure(0, weight=1)
+
+        output_text = tk.Text(out_frame, wrap=tk.NONE, font=("Consolas", 10))
+        output_text.grid(row=0, column=0, sticky="nsew")
+        scroll_y = ttk.Scrollbar(out_frame, orient=tk.VERTICAL, command=output_text.yview)
+        scroll_y.grid(row=0, column=1, sticky="ns")
+        scroll_x = ttk.Scrollbar(out_frame, orient=tk.HORIZONTAL, command=output_text.xview)
+        scroll_x.grid(row=1, column=0, sticky="ew")
+        output_text.config(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
 
         load_selected_preset()
         return input_text, status_lbl, ops_lbl, output_text, strategy_cb
@@ -240,17 +247,20 @@ class KRRProjectGUI:
         if not formula:
             return
 
-        query = (
+        query_template = (
             f"{predicate}('{{temp_file}}', Result, Ops, Trace), "
             "format('RESULT:~w|OPS:~w|TRACE:~w~n', [Result, Ops, Trace]), halt."
         )
         try:
             with self.temp_formula_file(temp_name, formula) as temp_file:
-                p = self.run_swipl(script_name, query.format(temp_file=temp_file))
+                safe_file = temp_file.replace("'", "\\'")
+                p = self.run_swipl(script_name, query_template.format(temp_file=safe_file))
 
             parsed = self.parse_prolog_line(p.stdout, "RESULT:")
             output_widget.delete("1.0", tk.END)
-            if not parsed:
+            if not parsed or not all(k in parsed for k in ("RESULT", "OPS", "TRACE")):
+                status_lbl.config(text="Eroare: Sintaxă CNF invalidă sau eroare de execuție", foreground="#C62828")
+                ops_lbl.config(text="Operații de rezoluție: -")
                 output_widget.insert(tk.END, f"Error running SWI-Prolog:\n{p.stderr or p.stdout}")
                 return
 
@@ -304,23 +314,26 @@ class KRRProjectGUI:
                     output_widget.insert(tk.END, "care au fost eliminate imediat conform optimizărilor din C5 p.6.\n")
                 return
 
-            pattern = (
-                r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+)\)\)"
-                if is_fol
-                else r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+),([^)]+)\)\)"
-            )
-            steps = re.findall(pattern, trace_str)
-            if not steps:
-                output_widget.insert(tk.END, f"{trace_str}\n")
-                return
-
-            for step in steps:
-                if is_fol:
-                    s_num, res_clause, id1, id2 = step
-                    output_widget.insert(tk.END, f"Pasul {s_num}: Rezolvare unificată între Clauza {id1} și Clauza {id2}\n")
-                    output_widget.insert(tk.END, f"         -> Rezolvent instanțiat: {res_clause}\n\n")
-                else:
-                    s_num, res_clause, id1, id2, piv = step
+            if is_fol:
+                steps = re.findall(r"step\((\d+),(\[[^\]]*\]),(resolved\(\d+,\d+\)|factored\(\d+\))\)", trace_str)
+                if not steps:
+                    output_widget.insert(tk.END, f"{trace_str}\n")
+                    return
+                for s_num, res_clause, op_desc in steps:
+                    if op_desc.startswith("resolved("):
+                        id1, id2 = op_desc[9:-1].split(",")
+                        output_widget.insert(tk.END, f"Pasul {s_num}: Rezolvare unificată între Clauza {id1} și Clauza {id2}\n")
+                        output_widget.insert(tk.END, f"         -> Rezolvent instanțiat: {res_clause}\n\n")
+                    else:
+                        cid = op_desc[9:-1]
+                        output_widget.insert(tk.END, f"Pasul {s_num}: Factorizare pe Clauza {cid}\n")
+                        output_widget.insert(tk.END, f"         -> Clauză factorizată: {res_clause}\n\n")
+            else:
+                steps = re.findall(r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+),(.+?)\)\)(?=,step|\])", trace_str)
+                if not steps:
+                    output_widget.insert(tk.END, f"{trace_str}\n")
+                    return
+                for s_num, res_clause, id1, id2, piv in steps:
                     output_widget.insert(tk.END, f"Pasul {s_num}: Rezolvare între Clauza {id1} și Clauza {id2} pe pivotul {piv}\n")
                     output_widget.insert(tk.END, f"         -> Rezolvent generat: {res_clause}\n\n")
         except Exception as e:
@@ -353,10 +366,11 @@ class KRRProjectGUI:
         )
 
     def query_dp_strategy(self, temp_file, strategy):
-        query = f"solve_dp('{temp_file}', {strategy}, Result, Model), format('RES:~w|MODEL:~w~n', [Result, Model]), halt."
+        safe_file = temp_file.replace("'", "\\'")
+        query = f"solve_dp('{safe_file}', {strategy}, Result, Model), format('RES:~w|MODEL:~w~n', [Result, Model]), halt."
         p = self.run_swipl("davis_putnam.pl", query)
         parsed = self.parse_prolog_line(p.stdout, "RES:")
-        if not parsed:
+        if not parsed or "RES" not in parsed or "MODEL" not in parsed:
             return None, p.stderr or p.stdout
         return parsed["RES"], parsed["MODEL"]
 
@@ -373,6 +387,7 @@ class KRRProjectGUI:
                     strat_name = "moms" if strat_choice == 0 else "dlis"
                     res_val, model_val = self.query_dp_strategy(temp_file, strat_name)
                     if res_val is None:
+                        self.dp_status_lbl.config(text="Result: Syntax / Execution Error", foreground="red")
                         self.dp_output.insert(tk.END, f"Error:\n{model_val}")
                         return
                     color = "green" if res_val == "YES" else "red"
@@ -382,15 +397,18 @@ class KRRProjectGUI:
                     self.dp_output.insert(tk.END, f"Satisfiability: {res_val}\n")
                     self.dp_output.insert(tk.END, f"Truth Values Assigned: {model_val}\n")
                 else:
-                    self.dp_status_lbl.config(text="Result: Comparison Complete", foreground="blue")
-                    self.dp_output.insert(tk.END, "=== STRATEGY COMPARISON: MOMS vs DLIS ===\n\n")
                     sections = [
                         ("moms", "--- 1. Strategy MOMS (Max Occurrences in Minimum Clauses) ---"),
                         ("dlis", "\n--- 2. Strategy DLIS (Dynamic Largest Individual Sum) ---"),
                     ]
-                    for strat_name, heading in sections:
+                    results = [(heading, *self.query_dp_strategy(temp_file, strat_name)) for strat_name, heading in sections]
+                    if any(res_val is None for _, res_val, _ in results):
+                        self.dp_status_lbl.config(text="Result: Syntax / Execution Error", foreground="red")
+                    else:
+                        self.dp_status_lbl.config(text="Result: Comparison Complete", foreground="blue")
+                    self.dp_output.insert(tk.END, "=== STRATEGY COMPARISON: MOMS vs DLIS ===\n\n")
+                    for heading, res_val, model_val in results:
                         self.dp_output.insert(tk.END, f"{heading}\n")
-                        res_val, model_val = self.query_dp_strategy(temp_file, strat_name)
                         if res_val is None:
                             self.dp_output.insert(tk.END, f"Error:\n{model_val}\n")
                         else:

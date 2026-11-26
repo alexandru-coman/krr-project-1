@@ -8,8 +8,7 @@ prove_propositional(FilePath, Result, OpsCount, Trace) :-
     (   member(clause(_, []), Clauses) ->
         Result = refutation_success, OpsCount = 0, Trace = [step(0, [], 'Initial empty clause')]
     ;   length(Clauses, MaxId),
-        prop_loop(Clauses, MaxId, [], 0, OpsCount, Result, RevTrace),
-        reverse(RevTrace, Trace)
+        prop_loop(Clauses, MaxId, [], 0, OpsCount, Result, Trace)
     ).
 
 preprocess_clauses(RawClauses, IndexedClauses) :-
