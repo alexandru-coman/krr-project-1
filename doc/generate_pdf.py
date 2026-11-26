@@ -57,91 +57,42 @@ def build_pdf():
         bottomMargin=54
     )
 
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle(
-        'DocTitle',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=20,
-        leading=24,
-        textColor=colors.HexColor('#1A237E'),
-        spaceAfter=6
-    )
-    
-    subtitle_style = ParagraphStyle(
-        'DocSubTitle',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=12,
-        leading=16,
-        textColor=colors.HexColor('#283593'),
-        spaceAfter=15
-    )
-    
-    meta_style = ParagraphStyle(
-        'DocMeta',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=9.5,
-        leading=14,
-        textColor=colors.HexColor('#333333'),
-        spaceAfter=15
-    )
+    base_style = getSampleStyleSheet()['Normal']
 
-    h1_style = ParagraphStyle(
-        'Heading1_Custom',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=13,
-        leading=17,
-        textColor=colors.HexColor('#0D47A1'),
-        spaceBefore=14,
-        spaceAfter=6,
-        keepWithNext=True
-    )
+    def make_style(name, font_name='Helvetica', font_size=9, leading=12, color='#212121', **kwargs):
+        return ParagraphStyle(
+            name,
+            parent=base_style,
+            fontName=font_name,
+            fontSize=font_size,
+            leading=leading,
+            textColor=colors.HexColor(color),
+            **kwargs,
+        )
 
-    h2_style = ParagraphStyle(
-        'Heading2_Custom',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=10.5,
-        leading=14,
-        textColor=colors.HexColor('#1565C0'),
-        spaceBefore=10,
-        spaceAfter=4,
-        keepWithNext=True
-    )
+    title_style = make_style('DocTitle', font_name='Helvetica-Bold', font_size=20, leading=24, color='#1A237E', spaceAfter=6)
+    subtitle_style = make_style('DocSubTitle', font_size=12, leading=16, color='#283593', spaceAfter=15)
+    meta_style = make_style('DocMeta', font_size=9.5, leading=14, color='#333333', spaceAfter=15)
+    h1_style = make_style('Heading1_Custom', font_name='Helvetica-Bold', font_size=13, leading=17, color='#0D47A1', spaceBefore=14, spaceAfter=6, keepWithNext=True)
+    h2_style = make_style('Heading2_Custom', font_name='Helvetica-Bold', font_size=10.5, leading=14, color='#1565C0', spaceBefore=10, spaceAfter=4, keepWithNext=True)
+    body_style = make_style('Body_Custom', font_size=9, leading=12.5, spaceAfter=6)
+    bullet_style = make_style('Bullet_Custom', font_size=8.5, leading=12, leftIndent=15, spaceAfter=3)
+    code_style = make_style('Code_Custom', font_name='Courier', font_size=7, leading=8.5, color='#1B5E20')
 
-    body_style = ParagraphStyle(
-        'Body_Custom',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=9,
-        leading=12.5,
-        textColor=colors.HexColor('#212121'),
-        spaceAfter=6
-    )
-
-    bullet_style = ParagraphStyle(
-        'Bullet_Custom',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=8.5,
-        leading=12,
-        leftIndent=15,
-        textColor=colors.HexColor('#212121'),
-        spaceAfter=3
-    )
-
-    code_style = ParagraphStyle(
-        'Code_Custom',
-        parent=styles['Normal'],
-        fontName='Courier',
-        fontSize=7,
-        leading=8.5,
-        textColor=colors.HexColor('#1B5E20')
-    )
+    def make_table(data, col_widths, font_size, align_rules):
+        table = Table(data, colWidths=col_widths)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E8EAF6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1A237E')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), font_size),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#BDBDBD')),
+            *align_rules,
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        return table
 
     story = []
 
@@ -212,18 +163,7 @@ def build_pdf():
         ["C3 p.33", "Animal lover & killer contradiction...", "refutation_success", "3"],
         ["C4 p.12", "Barber paradox (¬person(X) or shaves...)", "refutation_success", "5"]
     ]
-    t_fol = Table(fol_table_data, colWidths=[80, 230, 110, 60])
-    t_fol.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#E8EAF6')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#1A237E')),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#BDBDBD')),
-        ('ALIGN', (2,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-        ('TOPPADDING', (0,0), (-1,-1), 3)
-    ]))
+    t_fol = make_table(fol_table_data, [80, 230, 110, 60], 8, [('ALIGN', (2, 0), (-1, -1), 'CENTER')])
     story.append(t_fol)
     story.append(Spacer(1, 4))
 
@@ -238,19 +178,7 @@ def build_pdf():
         ["iv", "(a or b) and (¬a or ¬b) and c", "refutation_failure", "2", "SAT"],
         ["v", "(a or ¬b) and (b or ¬c) and ¬c", "refutation_failure", "0", "SAT"]
     ]
-    t_prop = Table(prop_table_data, colWidths=[20, 275, 105, 35, 45])
-    t_prop.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#E8EAF6')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#1A237E')),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 7.5),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#BDBDBD')),
-        ('ALIGN', (0,0), (0,-1), 'CENTER'),
-        ('ALIGN', (2,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-        ('TOPPADDING', (0,0), (-1,-1), 3)
-    ]))
+    t_prop = make_table(prop_table_data, [20, 275, 105, 35, 45], 7.5, [('ALIGN', (0, 0), (0, -1), 'CENTER'), ('ALIGN', (2, 0), (-1, -1), 'CENTER')])
     story.append(t_prop)
     story.append(Spacer(1, 6))
 
@@ -287,19 +215,7 @@ def build_pdf():
         ["v", "Propositional set 5", "YES", "YES", "{a/false; b/false; d/true; e/true; f/true}"],
         ["vi", "Propositional set 6", "NOT", "NOT", "{}"]
     ]
-    t_dp = Table(dp_table_data, colWidths=[20, 120, 50, 50, 240])
-    t_dp.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#E8EAF6')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#1A237E')),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 7),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#BDBDBD')),
-        ('ALIGN', (0,0), (0,-1), 'CENTER'),
-        ('ALIGN', (2,0), (3,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-        ('TOPPADDING', (0,0), (-1,-1), 3)
-    ]))
+    t_dp = make_table(dp_table_data, [20, 120, 50, 50, 240], 7, [('ALIGN', (0, 0), (0, -1), 'CENTER'), ('ALIGN', (2, 0), (3, -1), 'CENTER')])
     story.append(t_dp)
     story.append(Spacer(1, 6))
 
