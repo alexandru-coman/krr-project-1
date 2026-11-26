@@ -271,60 +271,52 @@ Prior to Herbrand's Theorem, verifying the unsatisfiability of a first-order for
 :- set_prolog_flag(double_quotes, chars).
 
 parse_kb_file(FilePath, Clauses) :-
-    read_file_to_string(FilePath, FormulaString, [encoding(utf8)]),
-    string_chars(FormulaString, Chars),
+    read_file_to_string(FilePath, Text, [encoding(utf8)]),
+    string_chars(Text, Chars),
     phrase(cnf_formula(Clauses), Chars).
 
-cnf_formula([FirstClause | RestClauses]) -->
-    whitespaces, clause_expr(FirstClause), whitespaces, conjunction_op, !,
-    cnf_formula(RestClauses).
-cnf_formula([SingleClause]) --> whitespaces, clause_expr(SingleClause), whitespaces.
-cnf_formula([]) --> whitespaces.
+cnf_formula([First | Rest]) -->
+    spaces, clause_expr(First), spaces, "and", spaces, !,
+    cnf_formula(Rest).
+cnf_formula([Last]) -->
+    spaces, clause_expr(Last), spaces.
 
-conjunction_op -->
-    whitespaces, ( "and" ; "^" ; "&" ; ";" ; [Char], { char_type(Char, newline) } ), whitespaces.
+clause_expr(Lits) --> "(", spaces, disjunction(Lits), spaces, ")", !.
+clause_expr(Lits) --> disjunction(Lits).
 
-clause_expr(Literals) --> "(", whitespaces, disjunction_expr(Literals), whitespaces, ")".
-clause_expr(Literals) --> "[", whitespaces, disjunction_expr(Literals), whitespaces, "]".
-clause_expr(Literals) --> disjunction_expr(Literals).
+disjunction([First | Rest]) -->
+    literal(First), spaces, "or", spaces, !,
+    disjunction(Rest).
+disjunction([Last]) -->
+    literal(Last).
 
-disjunction_expr([FirstLit | RestLits]) -->
-    literal_expr(FirstLit), whitespaces, disjunction_op, !,
-    disjunction_expr(RestLits).
-disjunction_expr([SingleLit]) --> literal_expr(SingleLit).
+literal(neg(Atom)) --> "not", space1, fol_term(Atom), !.
+literal(pos(Atom)) --> fol_term(Atom).
 
-disjunction_op --> whitespaces, ( "or" ; "v" ; "|" ; "," ), whitespaces.
-
-literal_expr(neg(Predicate)) --> negation_prefix, whitespaces, fol_term(Predicate).
-literal_expr(pos(Predicate)) --> fol_term(Predicate).
-
-negation_prefix --> "not", whitespaces.
-negation_prefix --> "¬" ; "~" ; "-".
-
-fol_term(Compound) -->
-    identifier(Functor, false), whitespaces, "(", whitespaces, arg_list(Args), whitespaces, ")", !,
-    { Compound =.. [Functor | Args] }.
 fol_term(Term) -->
-    identifier(Name, IsVar),
-    { IsVar == true -> Term = var(Name) ; Term = Name }.
+    ident(Functor), "(", spaces, args(Args), spaces, ")", !,
+    { Term =.. [Functor | Args] }.
+fol_term(Term) -->
+    ident(Name),
+    { atom_chars(Name, [C | _]), (char_type(C, upper) -> Term = var(Name) ; Term = Name) }.
 
-arg_list([FirstArg | RestArgs]) -->
-    fol_term(FirstArg), whitespaces, ",", whitespaces, !,
-    arg_list(RestArgs).
-arg_list([SingleArg]) --> fol_term(SingleArg).
+args([First | Rest]) -->
+    fol_term(First), spaces, ",", spaces, !,
+    args(Rest).
+args([Last]) -->
+    fol_term(Last).
 
-identifier(Name, true) -->
-    [First], { char_type(First, upper) ; First = '_' }, id_rest(Rest),
-    { atom_chars(Name, [First | Rest]) }.
-identifier(Name, false) -->
-    [First], { char_type(First, lower) }, id_rest(Rest),
-    { atom_chars(Name, [First | Rest]) }.
+ident(Name) -->
+    [C], { char_type(C, alpha) }, id_rest(Rest),
+    { atom_chars(Name, [C | Rest]) }.
 
-id_rest([Char | Rest]) --> [Char], { char_type(Char, alnum) ; Char = '_' }, !, id_rest(Rest).
+id_rest([C | Rest]) --> [C], { char_type(C, alnum) ; C = '_' }, !, id_rest(Rest).
 id_rest([]) --> [].
 
-whitespaces --> [Char], { char_type(Char, space) }, !, whitespaces.
-whitespaces --> [].
+space1 --> [C], { char_type(C, space) }, spaces.
+
+spaces --> [C], { char_type(C, space) }, !, spaces.
+spaces --> [].
 ```
 
 ### 5.2. `src/resolution_prop.pl`
@@ -336,12 +328,8 @@ whitespaces --> [].
 prove_propositional(FilePath, Result, OpsCount, Trace) :-
     parse_kb_file(FilePath, RawClauses),
     preprocess_clauses(RawClauses, Clauses),
-    (   member(clause(_, []), Clauses) ->
-        Result = refutation_success, OpsCount = 0, Trace = [step(0, [], 'Initial empty clause')]
-    ;   length(Clauses, MaxId),
-        prop_loop(Clauses, MaxId, [], 0, OpsCount, Result, RevTrace),
-        reverse(RevTrace, Trace)
-    ).
+    length(Clauses, MaxId),
+    prop_loop(Clauses, MaxId, [], 0, OpsCount, Result, Trace).
 
 preprocess_clauses(RawClauses, IndexedClauses) :-
     findall(Sorted, (member(Raw, RawClauses), sort(Raw, Sorted), \+ is_tautology(Sorted)), Cleaned),
@@ -365,15 +353,14 @@ prop_loop(Clauses, MaxId, History, OpsSoFar, TotalOps, Result, Trace) :-
     pick_shortest_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Pivot), !,
     resolve_on_pivot(Clause1, Clause2, Pivot, Resolvent),
     NextOps is OpsSoFar + 1,
-    opposite_lit(Pivot, NegPivot),
-    NextHistory = [resolved(Id1, Id2, Pivot), resolved(Id2, Id1, NegPivot) | History],
+    NextHistory = [resolved(Id1, Id2, Pivot) | History],
     Step = step(NextOps, Resolvent, resolved(Id1, Id2, Pivot)),
     (   Resolvent == [] ->
         TotalOps = NextOps, Result = refutation_success, Trace = [Step]
     ;   (is_tautology(Resolvent) ; subsumed_by_any(Resolvent, Clauses)) ->
         prop_loop(Clauses, MaxId, NextHistory, NextOps, TotalOps, Result, Trace)
     ;   findall(clause(Id, Existing),
-            (member(clause(Id, Existing), Clauses), \+ (Resolvent \== Existing, subset(Resolvent, Existing))),
+            (member(clause(Id, Existing), Clauses), \+ subset(Resolvent, Existing)),
             Surviving),
         NewId is MaxId + 1,
         prop_loop([clause(NewId, Resolvent) | Surviving], NewId, NextHistory, NextOps, TotalOps, Result, RestTrace),
@@ -414,24 +401,14 @@ subsumed_by_any(Resolvent, Clauses) :-
 prove_fol(FilePath, Result, OpsCount, Trace) :-
     parse_kb_file(FilePath, RawClauses),
     index_and_convert_clauses(RawClauses, 1, Clauses),
-    (   member(clause(_, []), Clauses) ->
-        Result = refutation_success, OpsCount = 0, Trace = [step(0, [], 'Initial empty clause')]
-    ;   length(Clauses, MaxId),
-        fol_loop(Clauses, MaxId, [], 0, OpsCount, Result, RevTrace),
-        reverse(RevTrace, Trace)
-    ).
+    length(Clauses, MaxId),
+    fol_loop(Clauses, MaxId, [], 0, OpsCount, Result, Trace).
 
 index_and_convert_clauses([], _, []).
 index_and_convert_clauses([RawClause | Rest], Id, [clause(Id, PrologClause) | RestIndexed]) :-
-    convert_literals(RawClause, [], _, PrologClause),
+    convert_terms(RawClause, [], _, PrologClause),
     NextId is Id + 1,
     index_and_convert_clauses(Rest, NextId, RestIndexed).
-
-convert_literals([], VarMap, VarMap, []).
-convert_literals([pos(Formula) | Rest], MapIn, MapOut, [pos(Conv) | ConvRest]) :-
-    convert_term(Formula, MapIn, MapMid, Conv), convert_literals(Rest, MapMid, MapOut, ConvRest).
-convert_literals([neg(Formula) | Rest], MapIn, MapOut, [neg(Conv) | ConvRest]) :-
-    convert_term(Formula, MapIn, MapMid, Conv), convert_literals(Rest, MapMid, MapOut, ConvRest).
 
 convert_term(var(Name), MapIn, MapOut, PrologVar) :- !,
     ( member(Name = PrologVar, MapIn) -> MapOut = MapIn ; MapOut = [Name = PrologVar | MapIn] ).
@@ -448,8 +425,8 @@ convert_terms([Arg | Rest], MapIn, MapOut, [ConvArg | ConvRest]) :-
 fol_loop(Clauses, MaxId, History, OpsSoFar, TotalOps, Result, Trace) :-
     pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1, Idx2), !,
     copy_term(Clause1, Fresh1), copy_term(Clause2, Fresh2),
-    nth1(Idx1, Fresh1, Lit1), nth1(Idx2, Fresh2, Lit2),
-    resolve_and_factor(Fresh1, Fresh2, Lit1, Lit2, Resolvent),
+    nth1(Idx1, Fresh1, Lit1, Rest1), nth1(Idx2, Fresh2, Lit2, Rest2),
+    resolve_and_factor(Rest1, Rest2, Lit1, Lit2, Resolvent),
     NextOps is OpsSoFar + 1,
     NextHistory = [resolved(Id1, Id2, Idx1, Idx2) | History],
     copy_term(Resolvent, PrintableResolvent), numbervars(PrintableResolvent, 0, _),
@@ -468,45 +445,27 @@ pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1,
     findall(pair(Size, I1, I2, Lits1, Lits2, Pos1, Pos2),
         (   member(clause(I1, Lits1), Clauses), member(clause(I2, Lits2), Clauses), I1 < I2,
             nth1(Pos1, Lits1, Lit1), nth1(Pos2, Lits2, Lit2),
-            can_unify_opposite(Lit1, Lit2),
+            opposite_atoms(Lit1, Lit2, Atom1, Atom2),
+            \+ \+ unify_with_occurs_check(Atom1, Atom2),
             \+ member(resolved(I1, I2, Pos1, Pos2), History),
             length(Lits1, Len1), length(Lits2, Len2), Size is Len1 + Len2
         ),
         Candidates),
     Candidates \== [],
-    sort(1, @=<, Candidates, [pair(_, Id1, Id2, Clause1, Clause2, Idx1, Idx2) | _]).
-
-can_unify_opposite(Lit1, Lit2) :-
-    opposite_atoms(Lit1, Lit2, Atom1, Atom2),
-    \+ \+ (copy_term(Atom1, Fresh1), copy_term(Atom2, Fresh2), Fresh1 = Fresh2).
+    sort(0, @=<, Candidates, [pair(_, Id1, Id2, Clause1, Clause2, Idx1, Idx2) | _]).
 
 opposite_atoms(pos(Atom1), neg(Atom2), Atom1, Atom2).
 opposite_atoms(neg(Atom1), pos(Atom2), Atom1, Atom2).
 
-resolve_and_factor(Clause1, Clause2, Lit1, Lit2, Resolvent) :-
-    opposite_atoms(Lit1, Lit2, Atom1, Atom2), Atom1 = Atom2,
-    remove_exact(Clause1, Lit1, Rest1), remove_exact(Clause2, Lit2, Rest2),
+resolve_and_factor(Rest1, Rest2, Lit1, Lit2, Resolvent) :-
+    opposite_atoms(Lit1, Lit2, Atom1, Atom2),
+    unify_with_occurs_check(Atom1, Atom2),
     append(Rest1, Rest2, Combined),
-    factor_duplicates(Combined, Resolvent).
-
-remove_exact([First | Rest], Target, Rest) :- First == Target, !.
-remove_exact([First | Rest], Target, [First | FilteredRest]) :- remove_exact(Rest, Target, FilteredRest).
-
-factor_duplicates([], []).
-factor_duplicates([Lit | Rest], UniqueLits) :-
-    ( member(Other, Rest), Lit == Other ->
-        factor_duplicates(Rest, UniqueLits)
-    ;   UniqueLits = [Lit | RestUnique], factor_duplicates(Rest, RestUnique)
-    ).
+    sort(Combined, Resolvent).
 
 subsumed_by_existing(Resolvent, Clauses) :-
     member(clause(_, Existing), Clauses),
-    \+ \+ (
-        copy_term(Existing, FreshExisting),
-        copy_term(Resolvent, FreshResolvent),
-        numbervars(FreshResolvent, 0, _),
-        subset(FreshExisting, FreshResolvent)
-    ), !.
+    \+ \+ (numbervars(Resolvent, 0, _), subset(Existing, Resolvent)), !.
 ```
 
 ### 5.4. `src/davis_putnam.pl`
@@ -530,22 +489,20 @@ dp_solve(Clauses, Strategy, Outcome, Model) :-
     simplify_clauses(Clauses, Cleaned),
     (   member([], Cleaned) -> Outcome = unsat, Model = []
     ;   Cleaned == [] -> Outcome = sat, Model = []
-    ;   member([UnitLit], Cleaned) ->
-        propagate_unit(Cleaned, UnitLit, Reduced),
-        lit_assignment(UnitLit, Atom, Value),
-        dp_solve(Reduced, Strategy, Outcome, SubModel),
-        ( Outcome == sat -> Model = [assign(Atom, Value) | SubModel] ; Model = [] )
-    ;   find_pure_literal(Cleaned, PureLit) ->
-        findall(Clause, (member(Clause, Cleaned), \+ member(PureLit, Clause)), Reduced),
-        lit_assignment(PureLit, Atom, Value),
-        dp_solve(Reduced, Strategy, Outcome, SubModel),
-        ( Outcome == sat -> Model = [assign(Atom, Value) | SubModel] ; Model = [] )
+    ;   (member([Lit], Cleaned) ; find_pure_literal(Cleaned, Lit)) ->
+        propagate_unit(Cleaned, Lit, Reduced),
+        lit_assignment(Lit, Atom, Value),
+        Model = [assign(Atom, Value) | SubModel],
+        dp_solve(Reduced, Strategy, Outcome, SubModel)
     ;   pick_pivot_atom(Cleaned, Strategy, Pivot),
         bullet_eliminate(Cleaned, Pivot, Reduced, NegClauses),
         dp_solve(Reduced, Strategy, Outcome, SubModel),
         ( Outcome == sat ->
-            infer_pivot_value(Pivot, NegClauses, SubModel, PivotValue),
-            Model = [assign(Pivot, PivotValue) | SubModel]
+            collect_all_atoms(Cleaned, CleanedAtoms),
+            subtract(CleanedAtoms, [Pivot], OtherAtoms),
+            fill_missing_atoms(OtherAtoms, SubModel, ExtSubModel),
+            infer_pivot_value(NegClauses, ExtSubModel, PivotValue),
+            Model = [assign(Pivot, PivotValue) | ExtSubModel]
         ;   Model = [] )
     ).
 
@@ -579,14 +536,12 @@ find_pure_literal(Clauses, PureLit) :-
     \+ member(OppositeLit, UniqueLits), !.
 
 pick_pivot_atom(Clauses, moms, Pivot) :-
-    findall(Len, (member(Clause, Clauses), length(Clause, Len), Len > 1), Lengths),
+    findall(Len, (member(Clause, Clauses), length(Clause, Len)), Lengths),
     min_list(Lengths, MinLen),
     findall(Clause, (member(Clause, Clauses), length(Clause, MinLen)), MinClauses),
     most_frequent_atom(MinClauses, Pivot), !.
 pick_pivot_atom(Clauses, dlis, Pivot) :-
     most_frequent_atom(Clauses, Pivot), !.
-pick_pivot_atom(Clauses, _, Pivot) :-
-    pick_pivot_atom(Clauses, moms, Pivot).
 
 most_frequent_atom(Clauses, BestAtom) :-
     collect_all_atoms(Clauses, Atoms),
@@ -598,29 +553,24 @@ most_frequent_atom(Clauses, BestAtom) :-
         Scored),
     sort(1, @>=, Scored, [score(_MaxCount, BestAtom) | _]).
 
-bullet_eliminate(Clauses, Pivot, Reduced, NegClauses) :-
+bullet_eliminate(Clauses, Pivot, Combined, NegClauses) :-
     findall(C, (member(C, Clauses), member(pos(Pivot), C)), PosClauses),
-    findall(C, (member(C, Clauses), \+ member(pos(Pivot), C), member(neg(Pivot), C)), NegClauses),
+    findall(C, (member(C, Clauses), member(neg(Pivot), C)), NegClauses),
     findall(C, (member(C, Clauses), \+ member(pos(Pivot), C), \+ member(neg(Pivot), C)), NeutralClauses),
-    findall(CleanResolvent,
+    findall(Raw,
         (   member(PosClause, PosClauses), member(NegClause, NegClauses),
             delete(PosClause, pos(Pivot), PosRest), delete(NegClause, neg(Pivot), NegRest),
-            append(PosRest, NegRest, Raw), sort(Raw, CleanResolvent),
-            \+ is_tautology(CleanResolvent)
+            append(PosRest, NegRest, Raw)
         ),
         Resolvents),
-    append(NeutralClauses, Resolvents, Combined),
-    simplify_clauses(Combined, Reduced).
+    append(NeutralClauses, Resolvents, Combined).
 
-infer_pivot_value(Pivot, NegClauses, SubModel, Value) :-
+infer_pivot_value(NegClauses, SubModel, Value) :-
     (   forall(member(Clause, NegClauses),
-            (member(Lit, Clause), lit_true_in_model(Lit, [assign(Pivot, true) | SubModel]))) ->
+            (member(Lit, Clause), lit_assignment(Lit, A, V), member(assign(A, V), SubModel))) ->
         Value = true
     ;   Value = false
     ).
-
-lit_true_in_model(pos(Atom), Model) :- member(assign(Atom, true), Model).
-lit_true_in_model(neg(Atom), Model) :- member(assign(Atom, false), Model).
 
 collect_all_atoms(Clauses, UniqueAtoms) :-
     findall(Atom, (member(C, Clauses), (member(pos(Atom), C) ; member(neg(Atom), C))), RawAtoms),

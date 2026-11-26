@@ -30,15 +30,14 @@ prop_loop(Clauses, MaxId, History, OpsSoFar, TotalOps, Result, Trace) :-
     pick_shortest_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Pivot), !,
     resolve_on_pivot(Clause1, Clause2, Pivot, Resolvent),
     NextOps is OpsSoFar + 1,
-    opposite_lit(Pivot, NegPivot),
-    NextHistory = [resolved(Id1, Id2, Pivot), resolved(Id2, Id1, NegPivot) | History],
+    NextHistory = [resolved(Id1, Id2, Pivot) | History],
     Step = step(NextOps, Resolvent, resolved(Id1, Id2, Pivot)),
     (   Resolvent == [] ->
         TotalOps = NextOps, Result = refutation_success, Trace = [Step]
     ;   (is_tautology(Resolvent) ; subsumed_by_any(Resolvent, Clauses)) ->
         prop_loop(Clauses, MaxId, NextHistory, NextOps, TotalOps, Result, Trace)
     ;   findall(clause(Id, Existing),
-            (member(clause(Id, Existing), Clauses), \+ (Resolvent \== Existing, subset(Resolvent, Existing))),
+            (member(clause(Id, Existing), Clauses), \+ subset(Resolvent, Existing)),
             Surviving),
         NewId is MaxId + 1,
         prop_loop([clause(NewId, Resolvent) | Surviving], NewId, NextHistory, NextOps, TotalOps, Result, RestTrace),

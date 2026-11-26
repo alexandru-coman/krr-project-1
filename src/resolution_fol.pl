@@ -10,16 +10,9 @@ prove_fol(FilePath, Result, OpsCount, Trace) :-
 
 index_and_convert_clauses([], _, []).
 index_and_convert_clauses([RawClause | Rest], Id, [clause(Id, PrologClause) | RestIndexed]) :-
-    convert_literals(RawClause, [], _, PrologClause),
+    convert_terms(RawClause, [], _, PrologClause),
     NextId is Id + 1,
     index_and_convert_clauses(Rest, NextId, RestIndexed).
-
-convert_literals([], VarMap, VarMap, []).
-convert_literals([Lit | Rest], MapIn, MapOut, [ConvLit | ConvRest]) :-
-    Lit =.. [Sign, Formula],
-    convert_term(Formula, MapIn, MapMid, ConvFormula),
-    ConvLit =.. [Sign, ConvFormula],
-    convert_literals(Rest, MapMid, MapOut, ConvRest).
 
 convert_term(var(Name), MapIn, MapOut, PrologVar) :- !,
     ( member(Name = PrologVar, MapIn) -> MapOut = MapIn ; MapOut = [Name = PrologVar | MapIn] ).
@@ -36,8 +29,8 @@ convert_terms([Arg | Rest], MapIn, MapOut, [ConvArg | ConvRest]) :-
 fol_loop(Clauses, MaxId, History, OpsSoFar, TotalOps, Result, Trace) :-
     pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1, Idx2), !,
     copy_term(Clause1, Fresh1), copy_term(Clause2, Fresh2),
-    nth1(Idx1, Fresh1, Lit1), nth1(Idx2, Fresh2, Lit2),
-    resolve_and_factor(Fresh1, Fresh2, Idx1, Idx2, Lit1, Lit2, Resolvent),
+    nth1(Idx1, Fresh1, Lit1, Rest1), nth1(Idx2, Fresh2, Lit2, Rest2),
+    resolve_and_factor(Rest1, Rest2, Lit1, Lit2, Resolvent),
     NextOps is OpsSoFar + 1,
     NextHistory = [resolved(Id1, Id2, Idx1, Idx2) | History],
     copy_term(Resolvent, PrintableResolvent), numbervars(PrintableResolvent, 0, _),
@@ -68,29 +61,12 @@ pick_shortest_unifiable_pair(Clauses, History, Id1, Id2, Clause1, Clause2, Idx1,
 opposite_atoms(pos(Atom1), neg(Atom2), Atom1, Atom2).
 opposite_atoms(neg(Atom1), pos(Atom2), Atom1, Atom2).
 
-resolve_and_factor(Clause1, Clause2, Idx1, Idx2, Lit1, Lit2, Resolvent) :-
+resolve_and_factor(Rest1, Rest2, Lit1, Lit2, Resolvent) :-
     opposite_atoms(Lit1, Lit2, Atom1, Atom2),
     unify_with_occurs_check(Atom1, Atom2),
-    remove_nth1(Idx1, Clause1, Rest1), remove_nth1(Idx2, Clause2, Rest2),
     append(Rest1, Rest2, Combined),
-    factor_duplicates(Combined, Resolvent).
-
-remove_nth1(1, [_ | Rest], Rest) :- !.
-remove_nth1(N, [First | Rest], [First | FilteredRest]) :-
-    N > 1, Next is N - 1, remove_nth1(Next, Rest, FilteredRest).
-
-factor_duplicates([], []).
-factor_duplicates([Lit | Rest], UniqueLits) :-
-    ( member(Other, Rest), Lit == Other ->
-        factor_duplicates(Rest, UniqueLits)
-    ;   UniqueLits = [Lit | RestUnique], factor_duplicates(Rest, RestUnique)
-    ).
+    sort(Combined, Resolvent).
 
 subsumed_by_existing(Resolvent, Clauses) :-
     member(clause(_, Existing), Clauses),
-    \+ \+ (
-        copy_term(Existing, FreshExisting),
-        copy_term(Resolvent, FreshResolvent),
-        numbervars(FreshResolvent, 0, _),
-        subset(FreshExisting, FreshResolvent)
-    ), !.
+    \+ \+ (numbervars(Resolvent, 0, _), subset(Existing, Resolvent)), !.

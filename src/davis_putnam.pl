@@ -17,14 +17,9 @@ dp_solve(Clauses, Strategy, Outcome, Model) :-
     simplify_clauses(Clauses, Cleaned),
     (   member([], Cleaned) -> Outcome = unsat, Model = []
     ;   Cleaned == [] -> Outcome = sat, Model = []
-    ;   member([UnitLit], Cleaned) ->
-        propagate_unit(Cleaned, UnitLit, Reduced),
-        lit_assignment(UnitLit, Atom, Value),
-        Model = [assign(Atom, Value) | SubModel],
-        dp_solve(Reduced, Strategy, Outcome, SubModel)
-    ;   find_pure_literal(Cleaned, PureLit) ->
-        findall(Clause, (member(Clause, Cleaned), \+ member(PureLit, Clause)), Reduced),
-        lit_assignment(PureLit, Atom, Value),
+    ;   (member([Lit], Cleaned) ; find_pure_literal(Cleaned, Lit)) ->
+        propagate_unit(Cleaned, Lit, Reduced),
+        lit_assignment(Lit, Atom, Value),
         Model = [assign(Atom, Value) | SubModel],
         dp_solve(Reduced, Strategy, Outcome, SubModel)
     ;   pick_pivot_atom(Cleaned, Strategy, Pivot),
@@ -34,7 +29,7 @@ dp_solve(Clauses, Strategy, Outcome, Model) :-
             collect_all_atoms(Cleaned, CleanedAtoms),
             subtract(CleanedAtoms, [Pivot], OtherAtoms),
             fill_missing_atoms(OtherAtoms, SubModel, ExtSubModel),
-            infer_pivot_value(Pivot, NegClauses, ExtSubModel, PivotValue),
+            infer_pivot_value(NegClauses, ExtSubModel, PivotValue),
             Model = [assign(Pivot, PivotValue) | ExtSubModel]
         ;   Model = [] )
     ).
@@ -69,7 +64,7 @@ find_pure_literal(Clauses, PureLit) :-
     \+ member(OppositeLit, UniqueLits), !.
 
 pick_pivot_atom(Clauses, moms, Pivot) :-
-    findall(Len, (member(Clause, Clauses), length(Clause, Len), Len > 1), Lengths),
+    findall(Len, (member(Clause, Clauses), length(Clause, Len)), Lengths),
     min_list(Lengths, MinLen),
     findall(Clause, (member(Clause, Clauses), length(Clause, MinLen)), MinClauses),
     most_frequent_atom(MinClauses, Pivot), !.
@@ -86,29 +81,24 @@ most_frequent_atom(Clauses, BestAtom) :-
         Scored),
     sort(1, @>=, Scored, [score(_MaxCount, BestAtom) | _]).
 
-bullet_eliminate(Clauses, Pivot, Reduced, NegClauses) :-
+bullet_eliminate(Clauses, Pivot, Combined, NegClauses) :-
     findall(C, (member(C, Clauses), member(pos(Pivot), C)), PosClauses),
     findall(C, (member(C, Clauses), member(neg(Pivot), C)), NegClauses),
     findall(C, (member(C, Clauses), \+ member(pos(Pivot), C), \+ member(neg(Pivot), C)), NeutralClauses),
-    findall(CleanResolvent,
+    findall(Raw,
         (   member(PosClause, PosClauses), member(NegClause, NegClauses),
             delete(PosClause, pos(Pivot), PosRest), delete(NegClause, neg(Pivot), NegRest),
-            append(PosRest, NegRest, Raw), sort(Raw, CleanResolvent),
-            \+ is_tautology(CleanResolvent)
+            append(PosRest, NegRest, Raw)
         ),
         Resolvents),
-    append(NeutralClauses, Resolvents, Combined),
-    simplify_clauses(Combined, Reduced).
+    append(NeutralClauses, Resolvents, Combined).
 
-infer_pivot_value(Pivot, NegClauses, SubModel, Value) :-
+infer_pivot_value(NegClauses, SubModel, Value) :-
     (   forall(member(Clause, NegClauses),
-            (member(Lit, Clause), lit_true_in_model(Lit, [assign(Pivot, true) | SubModel]))) ->
+            (member(Lit, Clause), lit_assignment(Lit, A, V), member(assign(A, V), SubModel))) ->
         Value = true
     ;   Value = false
     ).
-
-lit_true_in_model(pos(Atom), Model) :- member(assign(Atom, true), Model).
-lit_true_in_model(neg(Atom), Model) :- member(assign(Atom, false), Model).
 
 collect_all_atoms(Clauses, UniqueAtoms) :-
     findall(Atom, (member(C, Clauses), (member(pos(Atom), C) ; member(neg(Atom), C))), RawAtoms),
