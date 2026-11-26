@@ -1,5 +1,4 @@
 import os
-import sys
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import (
@@ -142,15 +141,6 @@ def build_pdf():
         fontSize=7,
         leading=8.5,
         textColor=colors.HexColor('#1B5E20')
-    )
-
-    tree_style = ParagraphStyle(
-        'Tree_Custom',
-        parent=styles['Normal'],
-        fontName='Courier',
-        fontSize=6.5,
-        leading=8,
-        textColor=colors.HexColor('#004D40')
     )
 
     story = []

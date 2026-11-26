@@ -1,25 +1,10 @@
-:- module(parser, [
-    parse_kb_file/2,
-    parse_kb_string/2,
-    parse_cnf/2,
-    parse_clause/2
-]).
+:- module(parser, [parse_kb_file/2]).
 
 :- encoding(utf8).
 :- set_prolog_flag(double_quotes, chars).
 
-parse_cnf(FormulaString, Clauses) :-
-    parse_kb_string(FormulaString, Clauses).
-
-parse_clause(ClauseString, Literals) :-
-    string_chars(ClauseString, Chars),
-    phrase((whitespaces, clause_expr(Literals), whitespaces), Chars).
-
 parse_kb_file(FilePath, Clauses) :-
     read_file_to_string(FilePath, FormulaString, [encoding(utf8)]),
-    parse_kb_string(FormulaString, Clauses).
-
-parse_kb_string(FormulaString, Clauses) :-
     string_chars(FormulaString, Chars),
     phrase(cnf_formula(Clauses), Chars).
 
@@ -47,7 +32,7 @@ literal_expr(neg(Predicate)) --> negation_prefix, whitespaces, fol_term(Predicat
 literal_expr(pos(Predicate)) --> fol_term(Predicate).
 
 negation_prefix --> "not", whitespaces.
-negation_prefix --> ['\u00AC'] ; "¬" ; "~" ; "-".
+negation_prefix --> "¬" ; "~" ; "-".
 
 fol_term(Compound) -->
     identifier(Functor, false), whitespaces, "(", whitespaces, arg_list(Args), whitespaces, ")", !,

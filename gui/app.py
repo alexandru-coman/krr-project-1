@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -157,7 +158,6 @@ class KRRProjectGUI:
                         self.prop_output.insert(tk.END, f"Cele {ops_str} operații de rezoluție efectuate au produs doar tautologii sau clauze subsumate,\n")
                         self.prop_output.insert(tk.END, "care au fost eliminate imediat conform optimizărilor din C5 p.6.\n")
                 else:
-                    import re
                     steps = re.findall(r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+),([^)]+)\)\)", trace_str)
                     if steps:
                         for s_num, res_clause, id1, id2, piv in steps:
@@ -272,7 +272,6 @@ class KRRProjectGUI:
                 self.fol_output.insert(tk.END, f"Status: {result_str}\n")
                 self.fol_output.insert(tk.END, f"Total Operații Rezoluție FOL Efectuate: {ops_str}\n\n")
                 self.fol_output.insert(tk.END, f"=== PAȘII DERIVĂRII / TRACE ===\n")
-                import re
                 steps = re.findall(r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+)\)\)", trace_str)
                 if steps:
                     for s_num, res_clause, id1, id2 in steps:
@@ -419,7 +418,7 @@ class KRRProjectGUI:
 
 def main():
     root = tk.Tk()
-    app = KRRProjectGUI(root)
+    KRRProjectGUI(root)
     root.mainloop()
 
 if __name__ == "__main__":

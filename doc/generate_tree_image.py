@@ -6,7 +6,7 @@ DOC_DIR = os.path.dirname(os.path.abspath(__file__))
 IMG_PATH = os.path.join(DOC_DIR, "resolution_tree.png")
 
 def create_tree():
-    fig, ax = plt.subplots(figsize=(10, 11), dpi=250)
+    _, ax = plt.subplots(figsize=(10, 11), dpi=250)
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 110)
     ax.axis("off")

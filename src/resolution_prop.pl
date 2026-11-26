@@ -1,15 +1,9 @@
-:- module(resolution_prop, [
-    prove_propositional/4,
-    prove_propositional/2
-]).
+:- module(resolution_prop, [prove_propositional/4]).
 
 :- use_module(parser).
 
-prove_propositional(FilePath, Result) :-
-    prove_propositional(FilePath, Result, _, _).
-
-prove_propositional(Input, Result, OpsCount, Trace) :-
-    ( is_list(Input) -> RawClauses = Input ; parse_kb_file(Input, RawClauses) ),
+prove_propositional(FilePath, Result, OpsCount, Trace) :-
+    parse_kb_file(FilePath, RawClauses),
     preprocess_clauses(RawClauses, Clauses),
     (   member(clause(_, []), Clauses) ->
         Result = refutation_success, OpsCount = 0, Trace = [step(0, [], 'Initial empty clause')]

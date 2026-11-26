@@ -1,14 +1,9 @@
-:- module(davis_putnam, [
-    solve_dp/4,
-    solve_dp/3,
-    solve_dp/2,
-    format_solution/2
-]).
+:- module(davis_putnam, [solve_dp/4]).
 
 :- use_module(parser).
 
-solve_dp(Input, Strategy, Result, ModelFormatted) :-
-    ( is_list(Input) -> Clauses = Input ; parse_kb_file(Input, Clauses) ),
+solve_dp(FilePath, Strategy, Result, ModelFormatted) :-
+    parse_kb_file(FilePath, Clauses),
     collect_all_atoms(Clauses, AllAtoms),
     dp_solve(Clauses, Strategy, Outcome, PartialModel),
     (   Outcome == sat ->
@@ -17,9 +12,6 @@ solve_dp(Input, Strategy, Result, ModelFormatted) :-
         format_solution(CompleteModel, ModelFormatted)
     ;   Result = 'NOT', ModelFormatted = '{}'
     ).
-
-solve_dp(Input, Strategy, Result) :- solve_dp(Input, Strategy, Result, _).
-solve_dp(Input, Result) :- solve_dp(Input, moms, Result, _).
 
 dp_solve(Clauses, Strategy, Outcome, Model) :-
     simplify_clauses(Clauses, Cleaned),

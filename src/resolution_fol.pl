@@ -1,15 +1,9 @@
-:- module(resolution_fol, [
-    prove_fol/4,
-    prove_fol/2
-]).
+:- module(resolution_fol, [prove_fol/4]).
 
 :- use_module(parser).
 
-prove_fol(FilePath, Result) :-
-    prove_fol(FilePath, Result, _, _).
-
-prove_fol(Input, Result, OpsCount, Trace) :-
-    ( is_list(Input) -> RawClauses = Input ; parse_kb_file(Input, RawClauses) ),
+prove_fol(FilePath, Result, OpsCount, Trace) :-
+    parse_kb_file(FilePath, RawClauses),
     index_and_convert_clauses(RawClauses, 1, Clauses),
     (   member(clause(_, []), Clauses) ->
         Result = refutation_success, OpsCount = 0, Trace = [step(0, [], 'Initial empty clause')]

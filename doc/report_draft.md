@@ -265,28 +265,13 @@ Prior to Herbrand's Theorem, verifying the unsatisfiability of a first-order for
 
 ### 5.1. `src/parser.pl`
 ```prolog
-:- module(parser, [
-    parse_kb_file/2,
-    parse_kb_string/2,
-    parse_cnf/2,
-    parse_clause/2
-]).
+:- module(parser, [parse_kb_file/2]).
 
 :- encoding(utf8).
 :- set_prolog_flag(double_quotes, chars).
 
-parse_cnf(FormulaString, Clauses) :-
-    parse_kb_string(FormulaString, Clauses).
-
-parse_clause(ClauseString, Literals) :-
-    string_chars(ClauseString, Chars),
-    phrase((whitespaces, clause_expr(Literals), whitespaces), Chars).
-
 parse_kb_file(FilePath, Clauses) :-
     read_file_to_string(FilePath, FormulaString, [encoding(utf8)]),
-    parse_kb_string(FormulaString, Clauses).
-
-parse_kb_string(FormulaString, Clauses) :-
     string_chars(FormulaString, Chars),
     phrase(cnf_formula(Clauses), Chars).
 
@@ -314,7 +299,7 @@ literal_expr(neg(Predicate)) --> negation_prefix, whitespaces, fol_term(Predicat
 literal_expr(pos(Predicate)) --> fol_term(Predicate).
 
 negation_prefix --> "not", whitespaces.
-negation_prefix --> ['\u00AC'] ; "¬" ; "~" ; "-".
+negation_prefix --> "¬" ; "~" ; "-".
 
 fol_term(Compound) -->
     identifier(Functor, false), whitespaces, "(", whitespaces, arg_list(Args), whitespaces, ")", !,
@@ -344,18 +329,12 @@ whitespaces --> [].
 
 ### 5.2. `src/resolution_prop.pl`
 ```prolog
-:- module(resolution_prop, [
-    prove_propositional/4,
-    prove_propositional/2
-]).
+:- module(resolution_prop, [prove_propositional/4]).
 
 :- use_module(parser).
 
-prove_propositional(FilePath, Result) :-
-    prove_propositional(FilePath, Result, _, _).
-
-prove_propositional(Input, Result, OpsCount, Trace) :-
-    ( is_list(Input) -> RawClauses = Input ; parse_kb_file(Input, RawClauses) ),
+prove_propositional(FilePath, Result, OpsCount, Trace) :-
+    parse_kb_file(FilePath, RawClauses),
     preprocess_clauses(RawClauses, Clauses),
     (   member(clause(_, []), Clauses) ->
         Result = refutation_success, OpsCount = 0, Trace = [step(0, [], 'Initial empty clause')]
@@ -428,18 +407,12 @@ subsumed_by_any(Resolvent, Clauses) :-
 
 ### 5.3. `src/resolution_fol.pl`
 ```prolog
-:- module(resolution_fol, [
-    prove_fol/4,
-    prove_fol/2
-]).
+:- module(resolution_fol, [prove_fol/4]).
 
 :- use_module(parser).
 
-prove_fol(FilePath, Result) :-
-    prove_fol(FilePath, Result, _, _).
-
-prove_fol(Input, Result, OpsCount, Trace) :-
-    ( is_list(Input) -> RawClauses = Input ; parse_kb_file(Input, RawClauses) ),
+prove_fol(FilePath, Result, OpsCount, Trace) :-
+    parse_kb_file(FilePath, RawClauses),
     index_and_convert_clauses(RawClauses, 1, Clauses),
     (   member(clause(_, []), Clauses) ->
         Result = refutation_success, OpsCount = 0, Trace = [step(0, [], 'Initial empty clause')]
@@ -538,17 +511,12 @@ subsumed_by_existing(Resolvent, Clauses) :-
 
 ### 5.4. `src/davis_putnam.pl`
 ```prolog
-:- module(davis_putnam, [
-    solve_dp/4,
-    solve_dp/3,
-    solve_dp/2,
-    format_solution/2
-]).
+:- module(davis_putnam, [solve_dp/4]).
 
 :- use_module(parser).
 
-solve_dp(Input, Strategy, Result, ModelFormatted) :-
-    ( is_list(Input) -> Clauses = Input ; parse_kb_file(Input, Clauses) ),
+solve_dp(FilePath, Strategy, Result, ModelFormatted) :-
+    parse_kb_file(FilePath, Clauses),
     collect_all_atoms(Clauses, AllAtoms),
     dp_solve(Clauses, Strategy, Outcome, PartialModel),
     (   Outcome == sat ->
@@ -557,9 +525,6 @@ solve_dp(Input, Strategy, Result, ModelFormatted) :-
         format_solution(CompleteModel, ModelFormatted)
     ;   Result = 'NOT', ModelFormatted = '{}'
     ).
-
-solve_dp(Input, Strategy, Result) :- solve_dp(Input, Strategy, Result, _).
-solve_dp(Input, Result) :- solve_dp(Input, moms, Result, _).
 
 dp_solve(Clauses, Strategy, Outcome, Model) :-
     simplify_clauses(Clauses, Cleaned),
