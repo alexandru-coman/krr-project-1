@@ -251,11 +251,10 @@ def build_pdf():
 
     for title, fpath in files_to_include:
         story.append(Paragraph(title, h2_style))
-        if os.path.exists(fpath):
-            with open(fpath, "r", encoding="utf-8") as f:
-                code_text = f.read()
-            story.append(Preformatted(code_text, code_style))
-            story.append(Spacer(1, 8))
+        with open(fpath, "r", encoding="utf-8") as f:
+            code_text = f.read()
+        story.append(Preformatted(code_text, code_style))
+        story.append(Spacer(1, 8))
 
     doc.build(story, canvasmaker=NumberedCanvas)
     print(f"Successfully generated PDF: {OUTPUT_PDF}")
