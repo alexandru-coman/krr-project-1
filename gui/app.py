@@ -11,11 +11,11 @@ SRC_DIR = os.path.join(PROJECT_DIR, "src")
 TESTS_DIR = os.path.join(PROJECT_DIR, "tests")
 
 PROP_PRESETS = [
-    ("Example 1: (¬a or b) and (c or d) and (¬d or b) ...", "s1_prop_1.txt"),
-    ("Example 2: (¬b or a) and (¬a or b or e) and ...", "s1_prop_2.txt"),
-    ("Example 3: (¬a or b) and (c or f) and ¬c ...", "s1_prop_3.txt"),
-    ("Example 4: (a or b) and (¬a or ¬b) and c", "s1_prop_4.txt"),
-    ("Example 5: (a or ¬b) and (b or ¬c) and ¬c", "s1_prop_5.txt"),
+    ("Example 1: (not a or b) and (c or d) and (not d or b) ...", "s1_prop_1.txt"),
+    ("Example 2: (not b or a) and (not a or b or e) and ...", "s1_prop_2.txt"),
+    ("Example 3: (not a or b) and (c or f) and not c ...", "s1_prop_3.txt"),
+    ("Example 4: (a or b) and (not a or not b) and c", "s1_prop_4.txt"),
+    ("Example 5: (a or not b) and (b or not c) and not c", "s1_prop_5.txt"),
 ]
 
 FOL_PRESETS = [
@@ -28,10 +28,10 @@ FOL_PRESETS = [
 DP_PRESETS = [
     ("Example 1: toddler and child and girl (SAT)", "s2_dp_1.txt"),
     ("Example 2: toddler and child and not girl (UNSAT)", "s2_dp_2.txt"),
-    ("Example 3: (¬a or b) and (c or d) and ¬b ... (UNSAT)", "s2_dp_3.txt"),
-    ("Example 4: (¬b or a) and e and ¬a (UNSAT)", "s2_dp_4.txt"),
-    ("Example 5: (¬a or ¬e or b) ... (SAT)", "s2_dp_5.txt"),
-    ("Example 6: (a or b) and (¬a or ¬b) and ... (UNSAT)", "s2_dp_6.txt"),
+    ("Example 3: (not a or b) and (c or d) and not b ... (UNSAT)", "s2_dp_3.txt"),
+    ("Example 4: (not b or a) and e and not a (UNSAT)", "s2_dp_4.txt"),
+    ("Example 5: (not a or not e or b) ... (SAT)", "s2_dp_5.txt"),
+    ("Example 6: (a or b) and (not a or not b) and ... (UNSAT)", "s2_dp_6.txt"),
 ]
 
 DP_STRATEGIES = [
@@ -180,8 +180,6 @@ class KRRProjectGUI:
         return input_text, status_lbl, ops_lbl, output_text, strategy_cb
 
     def set_text_from_file(self, text_widget, path):
-        if not path:
-            return
         with open(path, "r", encoding="utf-8") as f:
             content = f.read().strip()
         text_widget.delete("1.0", tk.END)
@@ -191,9 +189,10 @@ class KRRProjectGUI:
         path = filedialog.askopenfilename(
             initialdir=TESTS_DIR,
             title="Select CNF File",
-            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            filetypes=[("Text files", "*.txt")],
         )
-        self.set_text_from_file(text_widget, path)
+        if path:
+            self.set_text_from_file(text_widget, path)
 
     @contextmanager
     def temp_formula_file(self, filename, formula):
@@ -256,14 +255,11 @@ class KRRProjectGUI:
         self.prop_output.insert(tk.END, f"Total Operații Rezoluție Efectuate: {ops_str}\n\n")
         self.prop_output.insert(tk.END, "=== PAȘII DERIVĂRII / TRACE ===\n")
 
+        if trace_str == "[step(0,[],initial_empty_clause)]":
+            self.prop_output.insert(tk.END, "Pasul 0: Clauza vidă [] este prezentă inițial.\n")
+            return
         if trace_str == "[]":
-            if ops_str == "0":
-                self.prop_output.insert(tk.END, "Nicio operație de rezoluție necesară.\n")
-                self.prop_output.insert(tk.END, "Motiv: Clauzele redundante au fost eliminate prin optimizarea de subsumare (C5 p.6),\n")
-                self.prop_output.insert(tk.END, "iar clauzele rămase nu conțin literali complementari.\n")
-            else:
-                self.prop_output.insert(tk.END, f"Cele {ops_str} operații de rezoluție efectuate au produs doar tautologii sau clauze subsumate,\n")
-                self.prop_output.insert(tk.END, "care au fost eliminate imediat conform optimizărilor din C5 p.6.\n")
+            self.prop_output.insert(tk.END, f"Trace vid (Operații efectuate: {ops_str}).\n")
             return
 
         steps = re.findall(r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+),((?:pos|neg)\([^)]+\))\)\)", trace_str)
@@ -292,6 +288,13 @@ class KRRProjectGUI:
         self.fol_output.insert(tk.END, f"Status: {result_str}\n")
         self.fol_output.insert(tk.END, f"Total Operații Rezoluție FOL Efectuate: {ops_str}\n\n")
         self.fol_output.insert(tk.END, "=== PAȘII DERIVĂRII / TRACE ===\n")
+
+        if trace_str == "[step(0,[],initial_empty_clause)]":
+            self.fol_output.insert(tk.END, "Pasul 0: Clauza vidă [] este prezentă inițial.\n")
+            return
+        if trace_str == "[]":
+            self.fol_output.insert(tk.END, f"Trace vid (Operații efectuate: {ops_str}).\n")
+            return
 
         steps = re.findall(r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+)\)\)", trace_str)
         for s_num, res_clause, id1, id2 in steps:

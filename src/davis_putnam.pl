@@ -88,7 +88,7 @@ most_frequent_atom(Clauses, BestAtom) :-
 
 bullet_eliminate(Clauses, Pivot, Reduced, NegClauses) :-
     findall(C, (member(C, Clauses), member(pos(Pivot), C)), PosClauses),
-    findall(C, (member(C, Clauses), \+ member(pos(Pivot), C), member(neg(Pivot), C)), NegClauses),
+    findall(C, (member(C, Clauses), member(neg(Pivot), C)), NegClauses),
     findall(C, (member(C, Clauses), \+ member(pos(Pivot), C), \+ member(neg(Pivot), C)), NeutralClauses),
     findall(CleanResolvent,
         (   member(PosClause, PosClauses), member(NegClause, NegClauses),

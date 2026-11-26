@@ -1,12 +1,12 @@
 # Ghid Complet pentru Colocviu — Plan de Memorare & Explicații Linie cu Linie (KRR Project 1)
 
-> **Notă:** Acest fișier este strict ghidul tău de studiu pentru proba orală (nu intră în PDF-ul de predare și nu încalcă regula „fără comentarii în `src/`”). Numerotarea liniilor corespunde exact codului final simplificat (`347` de linii în total).
+> **Notă:** Acest fișier este strict ghidul tău de studiu pentru proba orală (nu intră în PDF-ul de predare și nu încalcă regula „fără comentarii în `src/`”). Numerotarea liniilor corespunde exact codului final standardizat (`370` de linii în total).
 
 ---
 
 ## 0. Cum înveți totul în ~30 de minute (Plan în 3 treceri)
 
-Nu încerca să tocești cele `347` de linii cuvânt cu cuvânt — **la colocviu ai codul deschis pe ecran**. Trebuie doar să știi să citești orice bloc de pe ecran și să explici *de ce* există.
+Nu încerca să tocești cele `370` de linii cuvânt cu cuvânt — **la colocviu ai codul deschis pe ecran**. Trebuie doar să știi să citești orice bloc de pe ecran și să explici *de ce* există.
 
 ### Trecerea 1 (5 min): Reține cele 7 „cărămizi” Prolog
 Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
@@ -19,9 +19,9 @@ Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
 7. **`\+ \+ (...)`** — probează dacă ceva merge fără să lase variabile legate în urmă.
 
 ### Trecerea 2 (10 min): Reține „povestea în 4 pași” a fiecărui fișier
-* **`src/parser.pl` (55 linii):** Un singur standard curat (`and`, `or`, `not ` cu spațiu, `(...)` opțional): textul $\rightarrow$ clauze (`cnf_formula`) $\rightarrow$ literali (`disjunction`) $\rightarrow$ `pos`/`neg` (`literal`) $\rightarrow$ literă mare = `var(Name)`, literă mică = constantă/functor (`ident`).
-* **`src/resolution_prop.pl` (70 linii):** Curăț dublurile, tautologiile și clauzele subsumate (`preprocess_clauses`) $\rightarrow$ iau mereu cea mai scurtă pereche neîncercată (`pick_shortest_pair`) $\rightarrow$ tai pivotul și sortez (`resolve_on_pivot`) $\rightarrow$ dacă iese `[]` e succes; dacă nu e tautologie/subsumată, arunc ce subsumează ea și continui (`Trace` iese direct în ordine `1..N`).
-* **`src/resolution_fol.pl` (95 linii):** Convertesc `var('X')` în variabile Prolog izolate per clauză (`index_and_convert_clauses`) $\rightarrow$ aleg cea mai scurtă pereche unificabilă (`pick_shortest_unifiable_pair`) $\rightarrow$ fac `copy_term`, unific cu `unify_with_occurs_check`, șterg literalii după index (`remove_nth1`) și scot dublurile (`factor_duplicates`) $\rightarrow$ verific `[]` sau subsumpția (`numbervars` + `subset`).
+* **`src/parser.pl` (64 linii):** Un singur format canonic strict: KB gol `""` $\rightarrow$ `[]`; clauze unite prin `"and"`; fiecare tip de clauză are o singură formă (`[]` vidă, `(L1 or L2 ...)` obligatoriu parantezată pentru `>= 2` literali, `L` obligatoriu neparantezat pentru unitar); `"not "` cu spațiu obligatoriu; identificatori cu `_` și whitespace standard (` `, `\t`, `\n`, `\r`).
+* **`src/resolution_prop.pl` (73 linii):** Curăț dublurile, tautologiile și clauzele subsumate (`preprocess_clauses`); dacă există clauza vidă `[]` inițial $\rightarrow$ succes din 0 pași (`initial_empty_clause`); altfel iau mereu cea mai scurtă pereche neîncercată (`pick_shortest_pair`), tai pivotul (`resolve_on_pivot`), elimin tautologiile/subsumările și construiesc `Trace` cronologic (`1..N`).
+* **`src/resolution_fol.pl` (106 linii):** Convertesc `var('X')` în variabile Prolog izolate per clauză și elimin tautologiile inițiale (`fol_is_tautology`), verific `[]` inițial, aleg cea mai scurtă pereche unificabilă (`unify_with_occurs_check`), șterg literalii după index (`remove_nth1`), scot dublurile (`factor_duplicates`) și verific tautologiile/subsumpția.
 * **`src/davis_putnam.pl` (127 linii):** Curăț clauzele (`simplify_clauses`) $\rightarrow$ testez pe rând: `[]` (`unsat`), listă goală (`sat`), **Unit** (forțez valoarea), **Pure** (apare doar cu un semn), **Glonț `•`** (elimin pivotul ales cu `moms`/`dlis` combinând `+` cu `-`, iar la întoarcere completez atomii rămași din `Cleaned \ [Pivot]` înainte de `infer_pivot_value`).
 
 ### Trecerea 3 (15 min): Parcurge liniile de mai jos + Auto-testul din Secțiunea 7
@@ -32,7 +32,7 @@ Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
 1. **Deschizi proiectul în VS Code:** `C:\Users\legio\Projects\KRR\Project 1`.
 2. **Rulezi toate cele 15 teste dintr-un click** (`Terminal -> Run Test Task` sau `swipl -s src/main.pl -g "run_all, halt."`).
 3. **Deschizi GUI-ul** (`Ctrl+Shift+B` sau `python gui/app.py`) și arăți cele 3 tab-uri:
-   * Tab 1 (*Prop*): încarci Exemplele `1–5` (arătând `5, 3, 2, 2, 0` operații, pașii în ordine `Pasul 1 ... Pasul N`, de ce la Ex. 4 sunt `2` operații cu `0` pași în trace și la Ex. 5 `0` operații).
+   * Tab 1 (*Prop*): încarci Exemplele `1–5` (`5, 3, 2, 2, 0` operații, pașii în ordine `Pasul 1 ... Pasul N`).
    * Tab 2 (*FOL*): arăți exemplul propriu (*Alex absolvent*, `10` operații, `8` pași în trace) + cele 3 exemple din curs (`C3 p.30`, `C3 p.33`, `C4 p.12`).
    * Tab 3 (*Davis-Putnam*): arăți **Compare Both Strategies Side-by-Side** pe Exemplul 1 (`YES`) și Exemplul 2 (`NOT`).
 
@@ -51,7 +51,7 @@ Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
 * **`s1_fol_own.txt`** (Alex absolvent) $\rightarrow$ `refutation_success`, **10 ops**, **8 trace steps**: 2 rezolvenți generați au fost deja subsumați de clauze existente (săriți din `Trace`).
 * **`s1_fol_c3_p30.txt`** (Socrate) $\rightarrow$ `refutation_success`, **2 ops**, **2 trace steps**.
 * **`s1_fol_c3_p33.txt`** (Animal lover & killer) $\rightarrow$ `refutation_success`, **3 ops**, **3 trace steps**.
-* **`s1_fol_c4_p12.txt`** (Paradoxul bărbierului) $\rightarrow$ `refutation_success`, **3 ops**, **3 trace steps**: `person(barber)` se rezolvă direct cu ambele clauze ale paradoxului producând `shaves(barber, barber)` și `¬shaves(barber, barber)`, apoi `[]`.
+* **`s1_fol_c4_p12.txt`** (Paradoxul bărbierului) $\rightarrow$ `refutation_success`, **3 ops**, **3 trace steps**: `person(barber)` se rezolvă direct cu ambele clauze ale paradoxului producând `shaves(barber, barber)` și `not shaves(barber, barber)`, apoi `[]`.
 
 ### Subiectul 2 — Davis-Putnam (`tests/s2_dp_1..6.txt`, strategii MOMS & DLIS)
 * **`s2_dp_1.txt`** $\rightarrow$ `YES`: `{boy/true; child/true; female/true; girl/true; infant/true; male/false; toddler/true}` (`toddler, female, girl` sunt forțate `true` ca unități $\rightarrow$ `child=true` $\rightarrow$ `male=false`; `boy` și `infant` rămân neconstrânși și primesc `true` din oficiu în `fill_missing_atoms`).
@@ -62,55 +62,56 @@ Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
 
 ---
 
-## 3. Explicație linie cu linie — `src/parser.pl` (Liniile 1–55)
+## 3. Explicație linie cu linie — `src/parser.pl` (Liniile 1–64)
 
 * **1:** Declarăm modulul `parser` și exportăm doar `parse_kb_file/2`.
 * **3–4:** `:- encoding(utf8).` și `:- set_prolog_flag(double_quotes, chars).` (ghilimelele duble din DCG sunt liste de caractere).
 * **6–9:** `parse_kb_file` — Citește tot fișierul în `Text`, îl sparge în `Chars` și pornește gramatica DCG `cnf_formula`.
-* **11–15:** `cnf_formula` — Citește o clauză urmată de `"and"` (cu `!`) și recursiv restul, sau ultima clauză `Last`.
-* **17–18:** `clause_expr` — Clauză între `(...)` sau direct `disjunction`.
-* **20–24:** `disjunction` — Literali separați prin `"or"`.
-* **26–27:** `literal` — `"not"` urmat de minim un spațiu (`space1`) dă `neg(Atom)`; altfel `pos(Atom)`.
-* **29–34:** `fol_term` — Dacă un nume cu literă mică e urmat de `(Args)`, îl construiește cu `=..`; altfel dacă `IsVar == true` devine `var(Name)`, altfel atomul/constanta `Name`.
-* **36–40:** `args` — Argumente separate prin `,`.
-* **42–50:** `ident` & `id_rest` — Literă mare $\rightarrow$ variabilă (`true`), literă mică $\rightarrow$ constantă/functor (`false`), urmate de caractere alfanumerice/`_`.
-* **52–55:** `space1` (cel puțin un spațiu) & `spaces` (zero sau mai multe spații).
+* **11–12:** `cnf_formula` — Fișierul gol sau doar cu spații (`spaces, eos`) dă `[]`; altfel consumă spațiile de la capete și parsează clauzele cu `cnf_clauses`.
+* **14–18:** `cnf_clauses` — Citește una sau mai multe clauze legate prin `"and"` (cu `!`).
+* **20–25:** `clause_expr` — Trei forme strict disjuncte: `[]` pentru clauza vidă, `(L1 or L2 ...)` cu minim 2 literali (taie cu `!` după `(`), sau `literal(Single)` fără paranteze pentru clauză unitară.
+* **27–31:** `disjunction_tail` — Citește al doilea literal și eventual restul literalilor legați prin `"or"`.
+* **33–34:** `literal` — `"not"` urmat de minim un spațiu (`space1`) dă `neg(Atom)`; altfel `pos(Atom)`.
+* **36–41:** `fol_term` — Nume cu literă mică urmat de `(Args)` construit cu `=..`, altfel variabilă `var(Name)` (literă mare) sau constantă/atom `Name`.
+* **43–47:** `args` — Argumente separate prin `,`.
+* **49–57:** `ident` & `id_rest` — Literă mare $\rightarrow$ variabilă (`true`), literă mică $\rightarrow$ constantă/functor (`false`, interzicând cuvintele cheie `and`, `or`, `not`), restul caracterelor putând fi `alnum` sau `'_'`.
+* **59–64:** `eos([], [])` (sfârșit de input), `space1` (minim un spațiu/tab/Enter) și `spaces` (0 sau mai multe spații/taburi/Enter-uri).
 
 ---
 
-## 4. Explicație linie cu linie — `src/resolution_prop.pl` (Liniile 1–70)
+## 4. Explicație linie cu linie — `src/resolution_prop.pl` (Liniile 1–73)
 
 * **1:** Exportăm `prove_propositional/4`.
 * **3:** Importăm `parser`.
-* **5–9:** `prove_propositional/4` — Citește clauzele (`parse_kb_file`), le preprocesează (`preprocess_clauses`), ia `MaxId = length(Clauses)` și rulează `prop_loop` direct (trace-ul e în ordine cronologică `1..N`).
-* **11–14:** `preprocess_clauses` — Cu `findall` sortează fiecare clauză (scoate dublurile) și aruncă tautologiile; `drop_subsumed` elimină clauzele subsumate; `index_clauses` le numerotează `1..N`.
-* **16–17:** `is_tautology` — Clauza are și `pos(Atom)` și `neg(Atom)`.
-* **19–22:** `drop_subsumed` — Curăță restul (`KeptRest`); dacă în `KeptRest` există o clauză inclusă în `Clause` (`subset(Other, Clause)`), aruncă `Clause`.
-* **24–27:** `index_clauses` — Atribuie ID-uri `1, 2, 3...`.
-* **29–35:** `prop_loop` — Alege perechea cea mai scurtă neîncercată (`pick_shortest_pair`), rezolvă (`resolve_on_pivot`), incrementează `NextOps`, salvează ambele direcții în `NextHistory` și creează `Step`.
-* **36–46:** Dacă `Resolvent == []` $\rightarrow$ `refutation_success`; dacă e tautologie sau subsumat (`subsumed_by_any`) îl aruncă; altfel elimină clauzele vechi subsumate de el, îl adaugă cu `NewId` și continuă recursiv.
-* **47:** Dacă nu mai sunt perechi noi $\rightarrow$ `refutation_failure`.
-* **49–58:** `pick_shortest_pair` — Adună toate perechile `(I1 < I2)` complementare neîncercate, sortează după `Len1 + Len2` și ia prima pereche.
-* **60–64:** `resolve_on_pivot` — Șterge `Pivot` și `NegPivot`, lipește restul și sortează.
-* **66–67:** `opposite_lit` — Întoarce semnul (`pos` $\leftrightarrow$ `neg`).
-* **69–70:** `subsumed_by_any` — Verifică dacă o clauză existentă e inclusă în `Resolvent`.
+* **5–12:** `prove_propositional/4` — Citește clauzele (`parse_kb_file`), le preprocesează (`preprocess_clauses`); dacă există deja `[]` $\rightarrow$ `refutation_success` din 0 operații cu `step(0, [], initial_empty_clause)`, altfel rulează `prop_loop` (trace în ordine cronologică `1..N`).
+* **14–17:** `preprocess_clauses` — Cu `findall` sortează fiecare clauză (scoate dublurile) și aruncă tautologiile; `drop_subsumed` elimină clauzele subsumate; `index_clauses` le numerotează `1..N`.
+* **19–20:** `is_tautology` — Clauza are și `pos(Atom)` și `neg(Atom)`.
+* **22–25:** `drop_subsumed` — Curăță restul (`KeptRest`); dacă în `KeptRest` există o clauză inclusă în `Clause` (`subset(Other, Clause)`), aruncă `Clause`.
+* **27–30:** `index_clauses` — Atribuie ID-uri `1, 2, 3...`.
+* **32–38:** `prop_loop` — Alege perechea cea mai scurtă neîncercată (`pick_shortest_pair`), rezolvă (`resolve_on_pivot`), incrementează `NextOps`, salvează ambele direcții în `NextHistory` și creează `Step`.
+* **39–49:** Dacă `Resolvent == []` $\rightarrow$ `refutation_success`; dacă e tautologie sau subsumat (`subsumed_by_any`) îl aruncă; altfel elimină clauzele vechi subsumate de el, îl adaugă cu `NewId` și continuă recursiv.
+* **50:** Dacă nu mai sunt perechi noi $\rightarrow$ `refutation_failure`.
+* **52–61:** `pick_shortest_pair` — Adună toate perechile `(I1 < I2)` complementare neîncercate, sortează după `Len1 + Len2` și ia prima pereche.
+* **63–67:** `resolve_on_pivot` — Șterge `Pivot` și `NegPivot`, lipește restul și sortează.
+* **69–70:** `opposite_lit` — Întoarce semnul (`pos` $\leftrightarrow$ `neg`).
+* **72–73:** `subsumed_by_any` — Verifică dacă o clauză existentă e inclusă în `Resolvent`.
 
 ---
 
-## 5. Explicație linie cu linie — `src/resolution_fol.pl` (Liniile 1–95)
+## 5. Explicație linie cu linie — `src/resolution_fol.pl` (Liniile 1–106)
 
 * **1:** Exportăm `prove_fol/4`.
 * **3:** Importăm `parser`.
-* **5–9:** `prove_fol/4` — Citește clauzele (`parse_kb_file`), convertește variabilele izolat per clauză (`index_and_convert_clauses`) și rulează `fol_loop` (trace în ordine cronologică `1..N`).
-* **11–33:** `index_and_convert_clauses`, `convert_literals`, `convert_term`, `convert_terms` — Transformă fiecare `var(Name)` din aceeași clauză într-o variabilă Prolog comună (`MapIn -> MapOut`) și descompune termenii compuși cu `=..`.
-* **35–51:** `fol_loop` — Alege cea mai scurtă pereche unificabilă (`pick_shortest_unifiable_pair`), face `copy_term` (*standardizing apart*), rezolvă cu `resolve_and_factor`, îngheață o copie cu `numbervars` pentru afișare (`Step`), verifică `[]` sau subsumpția (`subsumed_by_existing`) și adaugă `NewId`.
-* **52:** Dacă nu mai sunt perechi unificabile $\rightarrow$ `refutation_failure`.
-* **54–64:** `pick_shortest_unifiable_pair` — Găsește perechile `(I1 < I2)` ale căror literali opuși unifică sigur (`\+ \+ unify_with_occurs_check(Atom1, Atom2)`) și nu sunt în `History`, sortate după `Len1 + Len2`.
-* **66–67:** `opposite_atoms` — Extrage atomii dintr-un literal `pos` și unul `neg`.
-* **69–74:** `resolve_and_factor` — Unifică atomii cu `unify_with_occurs_check`, șterge exact pozițiile `Idx1`/`Idx2` (`remove_nth1`) și scoate dublurile identice (`factor_duplicates`).
-* **76–78:** `remove_nth1` — Elimină al `N`-lea literal fără a compara după unificare.
-* **80–85:** `factor_duplicates` — Păstrează o singură copie pentru literali sintactic identici (`==`).
-* **87–95:** `subsumed_by_existing` — Copiază ambele clauze, îngheață variabilele din `FreshResolvent` cu `numbervars` și verifică `subset` fără a lega permanent variabile (`\+ \+`).
+* **5–12:** `prove_fol/4` — Citește clauzele (`parse_kb_file`), le convertește și filtrează tautologiile inițiale (`index_and_convert_clauses`), verifică `[]` inițial (`step(0, [], initial_empty_clause)`), altfel pornește `fol_loop` (trace în ordine cronologică `1..N`).
+* **14–23:** `index_and_convert_clauses` & `index_clauses` — Convertește fiecare clauză cu variabile Prolog izolate, aruncă tautologiile inițiale (`\+ fol_is_tautology`) și dă ID-uri `1..N`.
+* **25–41:** `convert_literals`, `convert_term`, `convert_terms` — Transformă `var(Name)` într-o variabilă Prolog comună în clauză (`MapIn -> MapOut`) și descompune termenii compuși cu `=..`.
+* **43–60:** `fol_loop` — Alege perechea cea mai scurtă unificabilă (`pick_shortest_unifiable_pair`), face `copy_term` (*standardizing apart*), rezolvă (`resolve_and_factor`), îngheață o copie cu `numbervars` pentru afișare, verifică `[]`, tautologiile (`fol_is_tautology`) și subsumpția (`subsumed_by_existing`).
+* **62–63:** `fol_is_tautology` — Clauza conține doi literali cu același atom sintactic (`A == B`) și semne opuse.
+* **65–76:** `pick_shortest_unifiable_pair` — Găsește perechile `(I1 < I2)` care unifică sigur (`\+ \+ unify_with_occurs_check(Atom1, Atom2)`) și nu sunt în `History`, sortate după `Len1 + Len2`.
+* **78–79:** `opposite_atoms` — Extrage atomii dintr-un literal `pos` și unul `neg`.
+* **81–86:** `resolve_and_factor` — Unifică atomii cu `unify_with_occurs_check`, șterge exact pozițiile `Idx1`/`Idx2` (`remove_nth1`) și scoate dublurile identice (`factor_duplicates`).
+* **88–97:** `remove_nth1` și `factor_duplicates` — Elimină al `N`-lea literal și păstrează o singură copie pentru literali sintactic identici (`==`).
+* **99–106:** `subsumed_by_existing` — Copiază ambele clauze, îngheață variabilele din `FreshResolvent` cu `numbervars` și verifică `subset` fără a lega permanent variabile (`\+ \+`).
 
 ---
 
@@ -135,16 +136,16 @@ Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
 
 ## 7. Auto-Test Rapid de Colocviu (10 întrebări & răspunsuri)
 
-1. **De ce ai un singur standard în `parser.pl`?**
-   > Toate formulele din proiect folosesc același format CNF (`and`, `or`, `not ` cu spațiu, paranteze `(...)`), deci gramatica rămâne curată și ușor de explicat în `55` de linii.
+1. **Cum e definit formatul canonic unic în `parser.pl`?**
+   > `[]` pentru clauza vidă, `(L1 or L2 ...)` cu paranteze obligatorii pentru clauze cu minim 2 literali, `L` fără paranteze pentru unitare, `not ` pentru negație și `"and"` între clauze; fișierul gol dă `[]`.
 2. **De ce folosești `unify_with_occurs_check` în rezoluția FOL?**
-   > Previne unificările ciclice infinite (ex. `X = f(X)`), păstrând corectitudinea algoritmului fără linii în plus.
+   > Previne unificările ciclice infinite (ex. `X = f(X)`), păstrând corectitudinea algoritmului.
 3. **De ce faci `copy_term` înainte de rezoluția FOL?**
    > *Standardizing apart*: fără `copy_term`, unificarea ar lega variabilele direct în clauzele originale.
-4. **Ce face `numbervars` și unde îl folosești?**
+4. **De ce `fol_is_tautology` folosește `A == B` și nu `A = B`?**
+   > `p(X) or not p(X)` este tautologie adevărată (`A == B`), pe când `p(X) or not p(a)` nu este tautologie (`A \== B`) și nu trebuie ștearsă.
+5. **Ce face `numbervars` și unde îl folosești?**
    > Îngheață variabilele ca `A, B` pentru afișare în trace (`fol_loop`) și blochează variabilele lui `FreshResolvent` la testul de subsumpție (`subsumed_by_existing`).
-5. **Ce face `=..` (univ)?**
-   > Desface un termen compus în `[Functor | Argumente]` și îl reasamblează după convertirea argumentelor.
 6. **Ce optimizări are rezoluția propozițională (C5 p.6)?**
    > Eliminarea tautologiilor, eliminarea clauzelor subsumate (inițial și dinamic) și evitarea rezoluțiilor repetate prin `History` în ambele direcții.
 7. **De ce `s1_prop_4` are `Ops = 2` și `Trace = 0`?**

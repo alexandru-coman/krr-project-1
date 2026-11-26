@@ -5,8 +5,11 @@
 prove_propositional(FilePath, Result, OpsCount, Trace) :-
     parse_kb_file(FilePath, RawClauses),
     preprocess_clauses(RawClauses, Clauses),
-    length(Clauses, MaxId),
-    prop_loop(Clauses, MaxId, [], 0, OpsCount, Result, Trace).
+    (   member(clause(_, []), Clauses) ->
+        Result = refutation_success, OpsCount = 0, Trace = [step(0, [], initial_empty_clause)]
+    ;   length(Clauses, MaxId),
+        prop_loop(Clauses, MaxId, [], 0, OpsCount, Result, Trace)
+    ).
 
 preprocess_clauses(RawClauses, IndexedClauses) :-
     findall(Sorted, (member(Raw, RawClauses), sort(Raw, Sorted), \+ is_tautology(Sorted)), Cleaned),

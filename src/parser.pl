@@ -8,19 +8,26 @@ parse_kb_file(FilePath, Clauses) :-
     string_chars(Text, Chars),
     phrase(cnf_formula(Clauses), Chars).
 
-cnf_formula([First | Rest]) -->
-    spaces, clause_expr(First), spaces, "and", spaces, !,
-    cnf_formula(Rest).
-cnf_formula([Last]) -->
-    spaces, clause_expr(Last), spaces.
+cnf_formula([]) --> spaces, eos, !.
+cnf_formula(Clauses) --> spaces, cnf_clauses(Clauses), spaces.
 
-clause_expr(Lits) --> "(", spaces, disjunction(Lits), spaces, ")", !.
-clause_expr(Lits) --> disjunction(Lits).
+cnf_clauses([First | Rest]) -->
+    clause_expr(First), spaces, "and", spaces, !,
+    cnf_clauses(Rest).
+cnf_clauses([Last]) -->
+    clause_expr(Last).
 
-disjunction([First | Rest]) -->
+clause_expr([]) --> "[]", !.
+clause_expr([First, Second | Rest]) -->
+    "(", !, spaces, literal(First), spaces, "or", spaces,
+    disjunction_tail(Second, Rest), spaces, ")".
+clause_expr([Single]) -->
+    literal(Single).
+
+disjunction_tail(First, [Next | Rest]) -->
     literal(First), spaces, "or", spaces, !,
-    disjunction(Rest).
-disjunction([Last]) -->
+    disjunction_tail(Next, Rest).
+disjunction_tail(Last, []) -->
     literal(Last).
 
 literal(neg(Atom)) --> "not", space1, fol_term(Atom), !.
@@ -44,10 +51,12 @@ ident(Name, true) -->
     { atom_chars(Name, [C | Rest]) }.
 ident(Name, false) -->
     [C], { char_type(C, lower) }, id_rest(Rest),
-    { atom_chars(Name, [C | Rest]) }.
+    { atom_chars(Name, [C | Rest]), \+ memberchk(Name, [and, or, not]) }.
 
 id_rest([C | Rest]) --> [C], { char_type(C, alnum) ; C = '_' }, !, id_rest(Rest).
 id_rest([]) --> [].
+
+eos([], []).
 
 space1 --> [C], { char_type(C, space) }, spaces.
 
