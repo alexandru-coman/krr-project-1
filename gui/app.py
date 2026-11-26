@@ -184,11 +184,16 @@ class KRRProjectGUI:
         return input_text, status_lbl, ops_lbl, output_text, strategy_cb
 
     def set_text_from_file(self, text_widget, path):
-        if path and os.path.exists(path):
+        if not path or not os.path.exists(path):
+            return
+        try:
             with open(path, "r", encoding="utf-8") as f:
                 content = f.read().strip()
-            text_widget.delete("1.0", tk.END)
-            text_widget.insert(tk.END, content)
+        except (OSError, UnicodeDecodeError) as e:
+            messagebox.showerror("File Error", f"Could not read file:\n{e}")
+            return
+        text_widget.delete("1.0", tk.END)
+        text_widget.insert(tk.END, content)
 
     def load_file_into(self, text_widget):
         path = filedialog.askopenfilename(
@@ -218,12 +223,21 @@ class KRRProjectGUI:
 
     def run_swipl(self, script_name, query):
         pl_script = os.path.join(SRC_DIR, script_name).replace("\\", "/")
-        return subprocess.run(
-            [SWIPL_PATH, "-s", pl_script, "-g", query],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
+        try:
+            return subprocess.run(
+                [SWIPL_PATH, "-s", pl_script, "-g", query],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=15,
+            )
+        except subprocess.TimeoutExpired:
+            return subprocess.CompletedProcess(
+                args=[SWIPL_PATH],
+                returncode=124,
+                stdout="",
+                stderr="SWI-Prolog exceeded the 15s timeout (possible non-terminating FOL query).",
+            )
 
     def parse_prolog_line(self, stdout, marker):
         line = next((l for l in stdout.splitlines() if marker in l), None)
@@ -303,6 +317,9 @@ class KRRProjectGUI:
                 output_widget.insert(tk.END, f"Total Operații Rezoluție Efectuate: {ops_str}\n\n")
 
             output_widget.insert(tk.END, "=== PAȘII DERIVĂRII / TRACE ===\n")
+            if "Initial empty clause" in trace_str:
+                output_widget.insert(tk.END, "Pasul 0: Clauza vidă [] este prezentă deja inițial.\n")
+                return
             if not is_fol and (trace_str == "[]" or not trace_str):
                 if ops_str == "0":
                     output_widget.insert(tk.END, "Nicio operație de rezoluție necesară.\n")

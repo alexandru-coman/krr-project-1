@@ -124,6 +124,11 @@ fill_missing_atoms(AllAtoms, PartialModel, CompleteModel) :-
 
 format_solution(Model, Formatted) :-
     sort(Model, Sorted),
-    findall(Entry, (member(assign(A, V), Sorted), format(string(Entry), "~w/~w", [A, V])), Entries),
+    findall(Entry,
+        (member(assign(A, V), Sorted), display_atom(A, Name), format(string(Entry), "~w/~w", [Name, V])),
+        Entries),
     atomic_list_concat(Entries, '; ', Inner),
     format(string(Formatted), "{~w}", [Inner]).
+
+display_atom(var(Name), Name) :- !.
+display_atom(Atom, Atom).

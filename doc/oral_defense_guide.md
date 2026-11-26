@@ -1,12 +1,12 @@
 # Ghid Complet pentru Colocviu — Plan de Memorare & Explicații Linie cu Linie (KRR Project 1)
 
-> **Notă:** Acest fișier este strict ghidul tău de studiu pentru proba orală (nu intră în PDF-ul de predare și nu încalcă regula „fără comentarii în `src/`”). Numerotarea liniilor corespunde exact codului final (`418` de linii în total).
+> **Notă:** Acest fișier este strict ghidul tău de studiu pentru proba orală (nu intră în PDF-ul de predare și nu încalcă regula „fără comentarii în `src/`”). Numerotarea liniilor corespunde exact codului final (`430` de linii în total).
 
 ---
 
 ## 0. Cum înveți totul în ~35 de minute (Plan în 3 treceri)
 
-Nu încerca să tocești cele `418` de linii cuvânt cu cuvânt — **la colocviu ai codul deschis pe ecran**. Trebuie doar să știi să citești orice bloc de pe ecran și să explici *de ce* există.
+Nu încerca să tocești cele `430` de linii cuvânt cu cuvânt — **la colocviu ai codul deschis pe ecran**. Trebuie doar să știi să citești orice bloc de pe ecran și să explici *de ce* există.
 
 ### Trecerea 1 (5 min): Reține cele 7 „cărămizi” Prolog
 Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
@@ -19,10 +19,10 @@ Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
 7. **`\+ \+ (...)`** — probează dacă ceva merge fără să lase variabile legate în urmă.
 
 ### Trecerea 2 (10 min): Reține „povestea în 4 pași” a fiecărui fișier
-* **`src/parser.pl` (82 linii):** Textul din fișier $\rightarrow$ împărțit în clauze (`cnf_clauses`, `conjunction_op` cu operatori expliciți sau newline, granițe de cuvânt prin `keyword`) $\rightarrow$ în literali (`disjunction_op`) $\rightarrow$ în `pos`/`neg` (`literal_expr`, `"not"` doar cu spațiu după el ca să nu confunde `notes`) $\rightarrow$ literă mare/`_` = `var(Name)`, literă mică = constantă/functor (`identifier`).
+* **`src/parser.pl` (89 linii):** Textul din fișier $\rightarrow$ împărțit în clauze (`cnf_clauses`, `conjunction_op` cu operatori ASCII/Unicode sau newline, granițe prin `keyword` și clauze vide `[]`/`()`) $\rightarrow$ în literali (`disjunction_op`) $\rightarrow$ în `pos`/`neg` (`literal_expr`, suport atât pentru `not x`, cât și `not(x)`/`¬(x)` fără a confunda `notes`) $\rightarrow$ literă mare/`_` = `var(Name)`, literă mică = constantă/functor (`identifier`).
 * **`src/resolution_prop.pl` (73 linii):** Curăț dublurile, tautologiile și clauzele subsumate (`preprocess_clauses`) $\rightarrow$ iau mereu cea mai scurtă pereche neîncercată (`pick_shortest_pair`) $\rightarrow$ tai pivotul și sortez (`resolve_on_pivot`) $\rightarrow$ dacă iese `[]` e succes; dacă nu e tautologie/subsumată, arunc ce subsumează ea și continui; trace-ul iese direct în ordine cronologică (`1..N`).
 * **`src/resolution_fol.pl` (134 linii):** Convertesc `var('X')` în variabile Prolog izolate per clauză (`index_and_convert_clauses`) $\rightarrow$ aleg cel mai prioritar pas (`pick_next_step`: rezoluție binară sau factorizare) $\rightarrow$ fac `copy_term`, unific cu `unify_with_occurs_check`, elimin literalii (`remove_nth1`) și dublurile (`factor_duplicates`) $\rightarrow$ verific `[]`, tautologie (`fol_is_tautology`) sau subsumpție exactă (`subsumed_by_existing` cu `LenE =< LenR` și backtracking).
-* **`src/davis_putnam.pl` (129 linii):** Curăț clauzele (`simplify_clauses`) $\rightarrow$ testez pe rând: `[]` (`unsat`), listă goală (`sat`), **Unit** (forțez valoarea), **Pure** (apare doar cu un semn), **Glonț `•`** (elimin pivotul ales cu `moms`/`dlis` combinând `+` cu `-`, iar la întoarcere completez mai întâi eventualii atomi rămași neconstrânși din `Cleaned \ [Pivot]` cu `fill_missing_atoms` și abia apoi deduc valoarea lui `Pivot` din `NegClauses` în `infer_pivot_value`).
+* **`src/davis_putnam.pl` (134 linii):** Curăț clauzele (`simplify_clauses`) $\rightarrow$ testez pe rând: `[]` (`unsat`), listă goală (`sat`), **Unit** (forțez valoarea), **Pure** (apare doar cu un semn), **Glonț `•`** (elimin pivotul ales cu `moms`/`dlis` combinând `+` cu `-`, iar la întoarcere completez atomii rămași din `Cleaned \ [Pivot]` înainte de `infer_pivot_value` și afișez curat variabilele prin `display_atom`).
 
 ### Trecerea 3 (20 min): Parcurge liniile de mai jos + Auto-testul din Secțiunea 7
 
@@ -62,24 +62,23 @@ Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
 
 ---
 
-## 3. Explicație linie cu linie — `src/parser.pl` (Liniile 1–82)
+## 3. Explicație linie cu linie — `src/parser.pl` (Liniile 1–89)
 
 * **1:** Declarăm modulul `parser` și exportăm doar `parse_kb_file/2`.
-* **3:** `:- encoding(utf8).` — Permite citirea corectă a caracterului Unicode `¬`.
+* **3:** `:- encoding(utf8).` — Permite citirea corectă a caracterelor Unicode (`¬`, `∧`, `∨`).
 * **4:** `:- set_prolog_flag(double_quotes, chars).` — Face ca `"..."` în gramatică să fie liste de caractere pentru DCG.
 * **6–9:** `parse_kb_file` — Citește tot fișierul în UTF-8 (`FormulaString`), îl sparge în listă de caractere (`string_chars`) și pornește gramatica DCG de la `cnf_formula` (`phrase`).
 * **11–12:** `cnf_formula` — Dacă inputul e gol sau doar spații până la final (`eos_check`), întoarce `[]`; altfel consumă spațiile de la capete și parsează clauzele cu `cnf_clauses`.
 * **14–17:** `cnf_clauses` — Citește una sau mai multe clauze legate prin `conjunction_op` (fără să permită operator rămas agățat la final).
-* **19–25:** `conjunction_op` & `explicit_conj` — Scanează spațiile cu `scan_ws(HasNL)`; acceptă fie un operator explicit (`"and"`, `"^"`, `"&"`, `";"`), fie separare prin linie nouă (`HasNL == true` urmat de un caracter non-spațiu `peek_non_space`).
-* **27–29:** `clause_expr` — O clauză poate fi închisă între `(...)`, între `[...]`, sau fără paranteze.
-* **31–34:** `disjunction_expr` — Dacă după literal urmează `disjunction_op`, taie (`!`) și parsează restul literalilor; altfel un singur literal.
-* **36:** `disjunction_op` — Operator de SAU între literali: cuvântul `"or"`, `"v"`, sau `"|"`, `","`, cu spații.
-* **38–39:** `literal_expr` — Dacă începe cu `negation_prefix`, taie (`!`) ca să nu se reinterpreteze `"not"` drept atom și returnează `neg(Predicate)`; altfel `pos(Predicate)`.
-* **41–42:** `negation_prefix` — Recunoaște `"not"` doar când e urmat de un spațiu (`char_type(Char, space)`, ca `"notes"` să rămână atom pozitiv) sau simbolurile `¬`, `~`, `-`.
-* **44–49:** `fol_term` — Dacă un nume cu literă mică e urmat de `(Args)`, îl împachetează cu `=..`; altfel dacă `IsVar == true` devine `var(Name)`, altfel constanta/atomul `Name`.
-* **51–54:** `arg_list` — Listă de termeni `fol_term` despărțiți prin `,` (suportă funcții imbricate gen `f(g(X), y)`).
-* **56–64:** `identifier` & `id_rest` — Literă mare/`_` $\Rightarrow$ variabilă (`true`), literă mică $\Rightarrow$ constantă/functor (`false`), urmată de caractere `alnum` sau `_`.
-* **66–82:** `keyword`, `peek_non_id`, `eos_check`, `peek_non_space`, `scan_ws`, `whitespaces` — Verifică granița cuvintelor cheie (`and`, `or`, `v` nu pot fi lipite de alte litere/cifre), detectează newline-urile dintre clauze fără să le piardă, și consumă spațiile albe.
+* **19–25:** `conjunction_op` & `explicit_conj` — Scanează spațiile cu `scan_ws(HasNL)`; acceptă fie un operator explicit (`"and"`, `"^"`, `"&"`, `";"`, `"∧"`), fie separare prin linie nouă (`HasNL == true` urmat de un caracter non-spațiu `peek_non_space`).
+* **27–31:** `clause_expr` — Recunoaște clauze vide `()` / `[]` (`[]`) sau o clauză între `(...)`, între `[...]`, ori fără paranteze.
+* **33–36:** `disjunction_expr` — Dacă după literal urmează `disjunction_op`, taie (`!`) și parsează restul literalilor; altfel un singur literal.
+* **38:** `disjunction_op` — Operator de SAU între literali: `"or"`, `"v"`, `"|"`, `","` sau `"∨"`, cu spații.
+* **40–49:** `literal_expr`, `negation_symbol`, `peek_neg_delim`, `negated_target` — Acceptă `"not"` urmat de spațiu sau `(`, respectiv `¬`, `~`, `-` urmate de `fol_term` sau `(fol_term)`, tăind cu `!` ca `"not v"` să nu se reinterpreteze ca atom; `"notes"` și `"not_a"` pică testul `peek_neg_delim` și devin `pos(...)`.
+* **51–56:** `fol_term` — Dacă un nume cu literă mică e urmat de `(Args)`, îl împachetează cu `=..`; altfel dacă `IsVar == true` devine `var(Name)`, altfel constanta/atomul `Name`.
+* **58–61:** `arg_list` — Listă de termeni `fol_term` despărțiți prin `,` (suportă funcții imbricate gen `f(g(X), y)`).
+* **63–71:** `identifier` & `id_rest` — Literă mare/`_` $\Rightarrow$ variabilă (`true`), literă mică $\Rightarrow$ constantă/functor (`false`), urmată de caractere `alnum` sau `_`.
+* **73–89:** `keyword`, `peek_non_id`, `eos_check`, `peek_non_space`, `scan_ws`, `whitespaces` — Verifică granița cuvintelor cheie (`and`, `or`, `v` nu pot fi lipite de alte litere/cifre), detectează newline-urile dintre clauze fără să le piardă și consumă spațiile albe.
 
 ---
 
@@ -122,7 +121,7 @@ Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
 
 ---
 
-## 6. Explicație linie cu linie — `src/davis_putnam.pl` (Liniile 1–129)
+## 6. Explicație linie cu linie — `src/davis_putnam.pl` (Liniile 1–134)
 
 * **1:** Exportăm `solve_dp/4`.
 * **3:** Importăm `parser`.
@@ -139,7 +138,7 @@ Aproape toate liniile din proiect sunt combinații din exact aceste 7 piese:
 * **71–89:** `pick_pivot_atom` & `most_frequent_atom` — `moms` caută clauzele de lungime minimă (`> 1`); `dlis` caută în toate clauzele; alege atomul cu frecvența maximă (`sort(1, @>=, ...)`).
 * **91–103:** `bullet_eliminate` — Separă în `PosClauses`, `NegClauses`, `NeutralClauses`, formează toți rezolvenții non-tautologici și simplifică cu `NeutralClauses`.
 * **105–113:** `infer_pivot_value` & `lit_true_in_model` — Testează cu `forall` dacă `Pivot = true` împreună cu `ExtSubModel` satisface toate `NegClauses`; altfel alege `Pivot = false`.
-* **115–129:** `collect_all_atoms`, `fill_missing_atoms`, `format_solution` — Extrage atomii unici, completează valorile implicite `true` și formatează `{atom/val; ...}`.
+* **115–134:** `collect_all_atoms`, `fill_missing_atoms`, `format_solution`, `display_atom` — Extrage atomii unici, completează valorile implicite `true`, curăță eventualii identificatori `var(Name)` la `Name` și formatează `{atom/val; ...}`.
 
 ---
 

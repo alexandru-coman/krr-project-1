@@ -22,8 +22,10 @@ conjunction_op -->
     ;   { HasNL == true }, peek_non_space
     ).
 
-explicit_conj --> keyword("and") ; "^" ; "&" ; ";".
+explicit_conj --> keyword("and") ; "^" ; "&" ; ";" ; "∧".
 
+clause_expr([]) --> "(", whitespaces, ")", !.
+clause_expr([]) --> "[", whitespaces, "]", !.
 clause_expr(Literals) --> "(", whitespaces, disjunction_expr(Literals), whitespaces, ")".
 clause_expr(Literals) --> "[", whitespaces, disjunction_expr(Literals), whitespaces, "]".
 clause_expr(Literals) --> disjunction_expr(Literals).
@@ -33,13 +35,18 @@ disjunction_expr([FirstLit | RestLits]) -->
     disjunction_expr(RestLits).
 disjunction_expr([SingleLit]) --> literal_expr(SingleLit).
 
-disjunction_op --> whitespaces, ( keyword("or") ; keyword("v") ; "|" ; "," ), whitespaces.
+disjunction_op --> whitespaces, ( keyword("or") ; keyword("v") ; "|" ; "," ; "∨" ), whitespaces.
 
-literal_expr(neg(Predicate)) --> negation_prefix, !, whitespaces, fol_term(Predicate).
+literal_expr(neg(Predicate)) --> "not", peek_neg_delim, !, whitespaces, negated_target(Predicate).
+literal_expr(neg(Predicate)) --> negation_symbol, !, whitespaces, negated_target(Predicate).
 literal_expr(pos(Predicate)) --> fol_term(Predicate).
 
-negation_prefix --> "not", [Char], { char_type(Char, space) }, whitespaces.
-negation_prefix --> "¬" ; "~" ; "-".
+negation_symbol --> "¬" ; "~" ; "-".
+
+peek_neg_delim, [Char] --> [Char], { char_type(Char, space) ; Char = '(' }.
+
+negated_target(Predicate) --> "(", whitespaces, fol_term(Predicate), whitespaces, ")", !.
+negated_target(Predicate) --> fol_term(Predicate).
 
 fol_term(Compound) -->
     identifier(Functor, false), whitespaces, "(", whitespaces, arg_list(Args), whitespaces, ")", !,
