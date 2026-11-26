@@ -142,16 +142,11 @@ def build_pdf():
     story.append(Paragraph(p_cnf, body_style))
 
     tree_img_path = os.path.join(DOC_DIR, "resolution_tree.png")
-    if os.path.exists(tree_img_path):
-        story.append(KeepTogether([
-            Image(tree_img_path, width=470, height=520),
-            Spacer(1, 4),
-            Paragraph("<b>Figure 1:</b> Refutation Resolution Tree in First-Order Logic. The derivation of the empty clause [] completes the proof, verifying that <i>KB |= graduates(alex)</i>.", body_style)
-        ]))
-    else:
-        story.append(KeepTogether([
-            Paragraph("The derivation of the empty clause [] completes the refutation, proving KB |= graduates(alex).", body_style)
-        ]))
+    story.append(KeepTogether([
+        Image(tree_img_path, width=470, height=520),
+        Spacer(1, 4),
+        Paragraph("<b>Figure 1:</b> Refutation Resolution Tree in First-Order Logic. The derivation of the empty clause [] completes the proof, verifying that <i>KB |= graduates(alex)</i>.", body_style)
+    ]))
 
     story.append(Paragraph("1.c) Automatic FOL Resolution Evaluation", h2_style))
     story.append(Paragraph("The First-Order Logic resolution algorithm was implemented in Prolog (<i>resolution_fol.pl</i>), featuring standardizing apart, Robinson unification (MGU), factoring, and subsumption. The execution results on the test instances are summarized below:", body_style))

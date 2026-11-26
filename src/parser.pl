@@ -4,86 +4,52 @@
 :- set_prolog_flag(double_quotes, chars).
 
 parse_kb_file(FilePath, Clauses) :-
-    read_file_to_string(FilePath, FormulaString, [encoding(utf8)]),
-    string_chars(FormulaString, Chars),
+    read_file_to_string(FilePath, Text, [encoding(utf8)]),
+    string_chars(Text, Chars),
     phrase(cnf_formula(Clauses), Chars).
 
-cnf_formula([]) --> whitespaces, eos_check, !.
-cnf_formula(Clauses) --> whitespaces, cnf_clauses(Clauses), whitespaces.
+cnf_formula([First | Rest]) -->
+    spaces, clause_expr(First), spaces, "and", spaces, !,
+    cnf_formula(Rest).
+cnf_formula([Last]) -->
+    spaces, clause_expr(Last), spaces.
 
-cnf_clauses([FirstClause | RestClauses]) -->
-    clause_expr(FirstClause), conjunction_op, !,
-    cnf_clauses(RestClauses).
-cnf_clauses([SingleClause]) --> clause_expr(SingleClause).
+clause_expr(Lits) --> "(", spaces, disjunction(Lits), spaces, ")", !.
+clause_expr(Lits) --> disjunction(Lits).
 
-conjunction_op -->
-    scan_ws(HasNL),
-    (   explicit_conj, whitespaces
-    ;   { HasNL == true }, peek_non_space
-    ).
+disjunction([First | Rest]) -->
+    literal(First), spaces, "or", spaces, !,
+    disjunction(Rest).
+disjunction([Last]) -->
+    literal(Last).
 
-explicit_conj --> keyword("and") ; "^" ; "&" ; ";" ; "∧".
+literal(neg(Atom)) --> "not", space1, fol_term(Atom), !.
+literal(pos(Atom)) --> fol_term(Atom).
 
-clause_expr([]) --> "(", whitespaces, ")", !.
-clause_expr([]) --> "[", whitespaces, "]", !.
-clause_expr(Literals) --> "(", whitespaces, disjunction_expr(Literals), whitespaces, ")".
-clause_expr(Literals) --> "[", whitespaces, disjunction_expr(Literals), whitespaces, "]".
-clause_expr(Literals) --> disjunction_expr(Literals).
-
-disjunction_expr([FirstLit | RestLits]) -->
-    literal_expr(FirstLit), whitespaces, disjunction_op, !,
-    disjunction_expr(RestLits).
-disjunction_expr([SingleLit]) --> literal_expr(SingleLit).
-
-disjunction_op --> whitespaces, ( keyword("or") ; keyword("v") ; "|" ; "," ; "∨" ), whitespaces.
-
-literal_expr(neg(Predicate)) --> "not", peek_neg_delim, !, whitespaces, negated_target(Predicate).
-literal_expr(neg(Predicate)) --> negation_symbol, !, whitespaces, negated_target(Predicate).
-literal_expr(pos(Predicate)) --> fol_term(Predicate).
-
-negation_symbol --> "¬" ; "~" ; "-".
-
-peek_neg_delim, [Char] --> [Char], { char_type(Char, space) ; Char = '(' }.
-
-negated_target(Predicate) --> "(", whitespaces, fol_term(Predicate), whitespaces, ")", !.
-negated_target(Predicate) --> fol_term(Predicate).
-
-fol_term(Compound) -->
-    identifier(Functor, false), whitespaces, "(", whitespaces, arg_list(Args), whitespaces, ")", !,
-    { Compound =.. [Functor | Args] }.
 fol_term(Term) -->
-    identifier(Name, IsVar),
+    ident(Functor, false), "(", spaces, args(Args), spaces, ")", !,
+    { Term =.. [Functor | Args] }.
+fol_term(Term) -->
+    ident(Name, IsVar),
     { IsVar == true -> Term = var(Name) ; Term = Name }.
 
-arg_list([FirstArg | RestArgs]) -->
-    fol_term(FirstArg), whitespaces, ",", whitespaces, !,
-    arg_list(RestArgs).
-arg_list([SingleArg]) --> fol_term(SingleArg).
+args([First | Rest]) -->
+    fol_term(First), spaces, ",", spaces, !,
+    args(Rest).
+args([Last]) -->
+    fol_term(Last).
 
-identifier(Name, true) -->
-    [First], { char_type(First, upper) ; First = '_' }, id_rest(Rest),
-    { atom_chars(Name, [First | Rest]) }.
-identifier(Name, false) -->
-    [First], { char_type(First, lower) }, id_rest(Rest),
-    { atom_chars(Name, [First | Rest]) }.
+ident(Name, true) -->
+    [C], { char_type(C, upper) }, id_rest(Rest),
+    { atom_chars(Name, [C | Rest]) }.
+ident(Name, false) -->
+    [C], { char_type(C, lower) }, id_rest(Rest),
+    { atom_chars(Name, [C | Rest]) }.
 
-id_rest([Char | Rest]) --> [Char], { char_type(Char, alnum) ; Char = '_' }, !, id_rest(Rest).
+id_rest([C | Rest]) --> [C], { char_type(C, alnum) ; C = '_' }, !, id_rest(Rest).
 id_rest([]) --> [].
 
-keyword(Word) --> Word, peek_non_id.
+space1 --> [C], { char_type(C, space) }, spaces.
 
-peek_non_id, [Char] --> [Char], { \+ char_type(Char, alnum), Char \= '_' }, !.
-peek_non_id --> eos_check.
-
-eos_check([], []).
-
-peek_non_space, [Char] --> [Char], { \+ char_type(Char, space) }.
-
-scan_ws(HasNL) -->
-    [Char], { char_type(Char, space) }, !,
-    scan_ws(RestNL),
-    { (char_type(Char, newline) -> HasNL = true ; HasNL = RestNL) }.
-scan_ws(false) --> [].
-
-whitespaces --> [Char], { char_type(Char, space) }, !, whitespaces.
-whitespaces --> [].
+spaces --> [C], { char_type(C, space) }, !, spaces.
+spaces --> [].

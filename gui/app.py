@@ -3,12 +3,9 @@ import os
 import re
 import subprocess
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
 
 SWIPL_PATH = r"C:\Users\legio\swipl\bin\swipl.exe"
-if not os.path.exists(SWIPL_PATH):
-    SWIPL_PATH = "swipl"
-
 PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC_DIR = os.path.join(PROJECT_DIR, "src")
 TESTS_DIR = os.path.join(PROJECT_DIR, "tests")
@@ -158,8 +155,7 @@ class KRRProjectGUI:
 
         info_bar = ttk.Frame(res_frame)
         info_bar.pack(fill=tk.X, pady=(0, 5))
-        status_font = ("Segoe UI", 10 if with_ops else 11, "bold")
-        status_lbl = ttk.Label(info_bar, text=status_text, font=status_font)
+        status_lbl = ttk.Label(info_bar, text=status_text, font=("Segoe UI", 10, "bold"))
         status_lbl.pack(side=tk.LEFT, padx=5)
 
         ops_lbl = None
@@ -184,14 +180,10 @@ class KRRProjectGUI:
         return input_text, status_lbl, ops_lbl, output_text, strategy_cb
 
     def set_text_from_file(self, text_widget, path):
-        if not path or not os.path.exists(path):
+        if not path:
             return
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-        except (OSError, UnicodeDecodeError) as e:
-            messagebox.showerror("File Error", f"Could not read file:\n{e}")
-            return
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
         text_widget.delete("1.0", tk.END)
         text_widget.insert(tk.END, content)
 
@@ -203,233 +195,139 @@ class KRRProjectGUI:
         )
         self.set_text_from_file(text_widget, path)
 
-    def get_formula_or_warn(self, text_widget, empty_msg):
-        formula = text_widget.get("1.0", tk.END).strip()
-        if not formula:
-            messagebox.showwarning("Empty Formula", empty_msg)
-            return None
-        return formula
-
     @contextmanager
     def temp_formula_file(self, filename, formula):
         temp_file = os.path.join(PROJECT_DIR, filename).replace("\\", "/")
         with open(temp_file, "w", encoding="utf-8") as f:
             f.write(formula + "\n")
         try:
-            yield temp_file.replace("'", "\\'")
+            yield temp_file
         finally:
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
+            os.remove(temp_file)
 
     def run_swipl(self, script_name, query):
         pl_script = os.path.join(SRC_DIR, script_name).replace("\\", "/")
-        try:
-            return subprocess.run(
-                [SWIPL_PATH, "-s", pl_script, "-g", query],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                timeout=15,
+        return subprocess.run(
+            [SWIPL_PATH, "-s", pl_script, "-g", query],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+
+    def parse_line(self, stdout, marker):
+        line = next(l for l in stdout.splitlines() if l.startswith(marker))
+        return dict(part.split(":", 1) for part in line.split("|"))
+
+    def run_resolution_query(self, temp_name, formula, script_name, predicate):
+        with self.temp_formula_file(temp_name, formula) as temp_file:
+            query = (
+                f"{predicate}('{temp_file}', Result, Ops, Trace), "
+                "format('RESULT:~w|OPS:~w|TRACE:~w~n', [Result, Ops, Trace]), halt."
             )
-        except subprocess.TimeoutExpired:
-            return subprocess.CompletedProcess(
-                args=[SWIPL_PATH],
-                returncode=124,
-                stdout="",
-                stderr="SWI-Prolog exceeded the 15s timeout (possible non-terminating FOL query).",
-            )
-
-    def parse_prolog_line(self, stdout, marker):
-        line = next((l for l in stdout.splitlines() if marker in l), None)
-        if not line:
-            return None
-        return dict(part.split(":", 1) for part in line.split("|") if ":" in part)
-
-    def run_resolution(
-        self,
-        input_widget,
-        status_lbl,
-        ops_lbl,
-        output_widget,
-        empty_msg,
-        temp_name,
-        script_name,
-        predicate,
-        is_fol,
-    ):
-        formula = self.get_formula_or_warn(input_widget, empty_msg)
-        if not formula:
-            return
-
-        try:
-            with self.temp_formula_file(temp_name, formula) as temp_file:
-                query = (
-                    f"{predicate}('{temp_file}', Result, Ops, Trace), "
-                    "format('RESULT:~w|OPS:~w|TRACE:~w~n', [Result, Ops, Trace]), halt."
-                )
-                p = self.run_swipl(script_name, query)
-
-            parsed = self.parse_prolog_line(p.stdout, "RESULT:")
-            output_widget.delete("1.0", tk.END)
-            if not parsed or not all(k in parsed for k in ("RESULT", "OPS", "TRACE")):
-                status_lbl.config(text="Eroare: Sintaxă CNF invalidă sau eroare de execuție", foreground="#C62828")
-                ops_lbl.config(text="Operații de rezoluție: -")
-                output_widget.insert(tk.END, f"Error running SWI-Prolog:\n{p.stderr or p.stdout}")
-                return
-
-            result_str = parsed["RESULT"]
-            ops_str = parsed["OPS"]
-            trace_str = parsed["TRACE"]
-            is_unsat = result_str == "refutation_success"
-
-            if is_fol:
-                status_text = (
-                    "Rezultat: DEDUS LOGIC CU SUCCES (Refutation Succeeded -> Clauza vidă [] derivată)"
-                    if is_unsat
-                    else "Rezultat: CONSISTENT / NEDEDUS (Refutation Failed)"
-                )
-            else:
-                status_text = (
-                    "Rezultat: NESATISFIABILĂ / CONTRADICȚIE GĂSITĂ (Refutation Succeeded -> Clauza vidă [] derivată)"
-                    if is_unsat
-                    else "Rezultat: SATISFIABILĂ / CONSISTENTĂ (Refutation Failed -> Nu există contradicție / Nicio clauză vidă)"
-                )
-
-            status_lbl.config(text=status_text, foreground="#1B5E20" if is_unsat else "#0D47A1")
-            ops_lbl.config(text=f"Operații de rezoluție: {ops_str}")
-
-            output_widget.insert(tk.END, "===========================================================\n")
-            if is_fol:
-                output_widget.insert(tk.END, " RAPORT REZOLUȚIE FIRST-ORDER LOGIC (FOL)\n")
-                output_widget.insert(tk.END, "===========================================================\n")
-                output_widget.insert(tk.END, f"Status: {result_str}\n")
-                output_widget.insert(tk.END, f"Total Operații Rezoluție FOL Efectuate: {ops_str}\n\n")
-            else:
-                output_widget.insert(tk.END, " RAPORT REZOLUȚIE PROPOZIȚIONALĂ\n")
-                output_widget.insert(tk.END, "===========================================================\n")
-                if is_unsat:
-                    output_widget.insert(tk.END, "Status Matematic: NESATISFIABILĂ (UNSAT)\n")
-                    output_widget.insert(tk.END, "Semnificație:     Formula conține o contradicție logică. S-a derivat clauza vidă [].\n")
-                else:
-                    output_widget.insert(tk.END, "Status Matematic: SATISFIABILĂ (SAT)\n")
-                    output_widget.insert(tk.END, "Semnificație:     Formula este consistentă logic (există atribuiri de adevăr adevărate).\n")
-                    output_widget.insert(tk.END, "                  Metoda refutației se oprește fără a genera clauza vidă.\n")
-                output_widget.insert(tk.END, f"Total Operații Rezoluție Efectuate: {ops_str}\n\n")
-
-            output_widget.insert(tk.END, "=== PAȘII DERIVĂRII / TRACE ===\n")
-            if "Initial empty clause" in trace_str:
-                output_widget.insert(tk.END, "Pasul 0: Clauza vidă [] este prezentă deja inițial.\n")
-                return
-            if not is_fol and (trace_str == "[]" or not trace_str):
-                if ops_str == "0":
-                    output_widget.insert(tk.END, "Nicio operație de rezoluție necesară.\n")
-                    output_widget.insert(tk.END, "Motiv: Clauzele redundante au fost eliminate prin optimizarea de subsumare (C5 p.6),\n")
-                    output_widget.insert(tk.END, "iar clauzele rămase nu conțin literali complementari.\n")
-                else:
-                    output_widget.insert(tk.END, f"Cele {ops_str} operații de rezoluție efectuate au produs doar tautologii sau clauze subsumate,\n")
-                    output_widget.insert(tk.END, "care au fost eliminate imediat conform optimizărilor din C5 p.6.\n")
-                return
-
-            if is_fol:
-                steps = re.findall(r"step\((\d+),(\[[^\]]*\]),(resolved\(\d+,\d+\)|factored\(\d+\))\)", trace_str)
-                if not steps:
-                    output_widget.insert(tk.END, f"{trace_str}\n")
-                    return
-                for s_num, res_clause, op_desc in steps:
-                    if op_desc.startswith("resolved("):
-                        id1, id2 = op_desc[9:-1].split(",")
-                        output_widget.insert(tk.END, f"Pasul {s_num}: Rezolvare unificată între Clauza {id1} și Clauza {id2}\n")
-                        output_widget.insert(tk.END, f"         -> Rezolvent instanțiat: {res_clause}\n\n")
-                    else:
-                        cid = op_desc[9:-1]
-                        output_widget.insert(tk.END, f"Pasul {s_num}: Factorizare pe Clauza {cid}\n")
-                        output_widget.insert(tk.END, f"         -> Clauză factorizată: {res_clause}\n\n")
-            else:
-                steps = re.findall(r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+),(.+?)\)\)(?=,step|\])", trace_str)
-                if not steps:
-                    output_widget.insert(tk.END, f"{trace_str}\n")
-                    return
-                for s_num, res_clause, id1, id2, piv in steps:
-                    output_widget.insert(tk.END, f"Pasul {s_num}: Rezolvare între Clauza {id1} și Clauza {id2} pe pivotul {piv}\n")
-                    output_widget.insert(tk.END, f"         -> Rezolvent generat: {res_clause}\n\n")
-        except Exception as e:
-            messagebox.showerror("Execution Error", str(e))
+            p = self.run_swipl(script_name, query)
+        parsed = self.parse_line(p.stdout, "RESULT:")
+        return parsed["RESULT"], parsed["OPS"], parsed["TRACE"]
 
     def run_prop_resolution(self):
-        self.run_resolution(
-            self.prop_input,
-            self.prop_status_lbl,
-            self.prop_ops_lbl,
-            self.prop_output,
-            empty_msg="Please enter or select a CNF formula.",
-            temp_name="temp_prop.txt",
-            script_name="resolution_prop.pl",
-            predicate="prove_propositional",
-            is_fol=False,
+        formula = self.prop_input.get("1.0", tk.END).strip()
+        result_str, ops_str, trace_str = self.run_resolution_query(
+            "temp_prop.txt", formula, "resolution_prop.pl", "prove_propositional"
         )
+        is_unsat = result_str == "refutation_success"
+        status_text = (
+            "Rezultat: NESATISFIABILĂ / CONTRADICȚIE GĂSITĂ (Refutation Succeeded -> Clauza vidă [] derivată)"
+            if is_unsat
+            else "Rezultat: SATISFIABILĂ / CONSISTENTĂ (Refutation Failed -> Nu există contradicție / Nicio clauză vidă)"
+        )
+        self.prop_status_lbl.config(text=status_text, foreground="#1B5E20" if is_unsat else "#0D47A1")
+        self.prop_ops_lbl.config(text=f"Operații de rezoluție: {ops_str}")
+
+        self.prop_output.delete("1.0", tk.END)
+        self.prop_output.insert(tk.END, "===========================================================\n")
+        self.prop_output.insert(tk.END, " RAPORT REZOLUȚIE PROPOZIȚIONALĂ\n")
+        self.prop_output.insert(tk.END, "===========================================================\n")
+        if is_unsat:
+            self.prop_output.insert(tk.END, "Status Matematic: NESATISFIABILĂ (UNSAT)\n")
+            self.prop_output.insert(tk.END, "Semnificație:     Formula conține o contradicție logică. S-a derivat clauza vidă [].\n")
+        else:
+            self.prop_output.insert(tk.END, "Status Matematic: SATISFIABILĂ (SAT)\n")
+            self.prop_output.insert(tk.END, "Semnificație:     Formula este consistentă logic (există atribuiri de adevăr adevărate).\n")
+            self.prop_output.insert(tk.END, "                  Metoda refutației se oprește fără a genera clauza vidă.\n")
+        self.prop_output.insert(tk.END, f"Total Operații Rezoluție Efectuate: {ops_str}\n\n")
+        self.prop_output.insert(tk.END, "=== PAȘII DERIVĂRII / TRACE ===\n")
+
+        if trace_str == "[]":
+            if ops_str == "0":
+                self.prop_output.insert(tk.END, "Nicio operație de rezoluție necesară.\n")
+                self.prop_output.insert(tk.END, "Motiv: Clauzele redundante au fost eliminate prin optimizarea de subsumare (C5 p.6),\n")
+                self.prop_output.insert(tk.END, "iar clauzele rămase nu conțin literali complementari.\n")
+            else:
+                self.prop_output.insert(tk.END, f"Cele {ops_str} operații de rezoluție efectuate au produs doar tautologii sau clauze subsumate,\n")
+                self.prop_output.insert(tk.END, "care au fost eliminate imediat conform optimizărilor din C5 p.6.\n")
+            return
+
+        steps = re.findall(r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+),((?:pos|neg)\([^)]+\))\)\)", trace_str)
+        for s_num, res_clause, id1, id2, piv in steps:
+            self.prop_output.insert(tk.END, f"Pasul {s_num}: Rezolvare între Clauza {id1} și Clauza {id2} pe pivotul {piv}\n")
+            self.prop_output.insert(tk.END, f"         -> Rezolvent generat: {res_clause}\n\n")
 
     def run_fol_resolution(self):
-        self.run_resolution(
-            self.fol_input,
-            self.fol_status_lbl,
-            self.fol_ops_lbl,
-            self.fol_output,
-            empty_msg="Please enter or select a FOL CNF formula.",
-            temp_name="temp_fol.txt",
-            script_name="resolution_fol.pl",
-            predicate="prove_fol",
-            is_fol=True,
+        formula = self.fol_input.get("1.0", tk.END).strip()
+        result_str, ops_str, trace_str = self.run_resolution_query(
+            "temp_fol.txt", formula, "resolution_fol.pl", "prove_fol"
         )
+        is_unsat = result_str == "refutation_success"
+        status_text = (
+            "Rezultat: DEDUS LOGIC CU SUCCES (Refutation Succeeded -> Clauza vidă [] derivată)"
+            if is_unsat
+            else "Rezultat: CONSISTENT / NEDEDUS (Refutation Failed)"
+        )
+        self.fol_status_lbl.config(text=status_text, foreground="#1B5E20" if is_unsat else "#0D47A1")
+        self.fol_ops_lbl.config(text=f"Operații de rezoluție: {ops_str}")
+
+        self.fol_output.delete("1.0", tk.END)
+        self.fol_output.insert(tk.END, "===========================================================\n")
+        self.fol_output.insert(tk.END, " RAPORT REZOLUȚIE FIRST-ORDER LOGIC (FOL)\n")
+        self.fol_output.insert(tk.END, "===========================================================\n")
+        self.fol_output.insert(tk.END, f"Status: {result_str}\n")
+        self.fol_output.insert(tk.END, f"Total Operații Rezoluție FOL Efectuate: {ops_str}\n\n")
+        self.fol_output.insert(tk.END, "=== PAȘII DERIVĂRII / TRACE ===\n")
+
+        steps = re.findall(r"step\((\d+),(\[[^\]]*\]),resolved\((\d+),(\d+)\)\)", trace_str)
+        for s_num, res_clause, id1, id2 in steps:
+            self.fol_output.insert(tk.END, f"Pasul {s_num}: Rezolvare unificată între Clauza {id1} și Clauza {id2}\n")
+            self.fol_output.insert(tk.END, f"         -> Rezolvent instanțiat: {res_clause}\n\n")
 
     def query_dp_strategy(self, temp_file, strategy):
         query = f"solve_dp('{temp_file}', {strategy}, Result, Model), format('RES:~w|MODEL:~w~n', [Result, Model]), halt."
         p = self.run_swipl("davis_putnam.pl", query)
-        parsed = self.parse_prolog_line(p.stdout, "RES:")
-        if not parsed or "RES" not in parsed or "MODEL" not in parsed:
-            return None, p.stderr or p.stdout
+        parsed = self.parse_line(p.stdout, "RES:")
         return parsed["RES"], parsed["MODEL"]
 
     def run_dp_solver(self):
-        formula = self.get_formula_or_warn(self.dp_input, "Please enter or select a CNF formula.")
-        if not formula:
-            return
-
+        formula = self.dp_input.get("1.0", tk.END).strip()
         strat_choice = self.dp_strategy_cb.current()
-        try:
-            self.dp_output.delete("1.0", tk.END)
-            with self.temp_formula_file("temp_dp.txt", formula) as temp_file:
-                if strat_choice in (0, 1):
-                    strat_name = "moms" if strat_choice == 0 else "dlis"
-                    res_val, model_val = self.query_dp_strategy(temp_file, strat_name)
-                    if res_val is None:
-                        self.dp_status_lbl.config(text="Result: Syntax / Execution Error", foreground="red")
-                        self.dp_output.insert(tk.END, f"Error:\n{model_val}")
-                        return
-                    color = "green" if res_val == "YES" else "red"
-                    self.dp_status_lbl.config(text=f"Result: {res_val}", foreground=color)
-                    self.dp_output.insert(tk.END, "=== DAVIS-PUTNAM SAT SOLVER ===\n")
-                    self.dp_output.insert(tk.END, f"Strategy Used: {strat_name.upper()}\n")
-                    self.dp_output.insert(tk.END, f"Satisfiability: {res_val}\n")
-                    self.dp_output.insert(tk.END, f"Truth Values Assigned: {model_val}\n")
-                else:
-                    sections = [
-                        ("moms", "--- 1. Strategy MOMS (Max Occurrences in Minimum Clauses) ---"),
-                        ("dlis", "\n--- 2. Strategy DLIS (Dynamic Largest Individual Sum) ---"),
-                    ]
-                    results = [(heading, *self.query_dp_strategy(temp_file, strat_name)) for strat_name, heading in sections]
-                    if any(res_val is None for _, res_val, _ in results):
-                        self.dp_status_lbl.config(text="Result: Syntax / Execution Error", foreground="red")
-                    else:
-                        self.dp_status_lbl.config(text="Result: Comparison Complete", foreground="blue")
-                    self.dp_output.insert(tk.END, "=== STRATEGY COMPARISON: MOMS vs DLIS ===\n\n")
-                    for heading, res_val, model_val in results:
-                        self.dp_output.insert(tk.END, f"{heading}\n")
-                        if res_val is None:
-                            self.dp_output.insert(tk.END, f"Error:\n{model_val}\n")
-                        else:
-                            self.dp_output.insert(tk.END, f"Result: {res_val}\nModel:  {model_val}\n")
-        except Exception as e:
-            messagebox.showerror("Execution Error", str(e))
+        self.dp_output.delete("1.0", tk.END)
+
+        with self.temp_formula_file("temp_dp.txt", formula) as temp_file:
+            if strat_choice in (0, 1):
+                strat_name = "moms" if strat_choice == 0 else "dlis"
+                res_val, model_val = self.query_dp_strategy(temp_file, strat_name)
+                color = "green" if res_val == "YES" else "red"
+                self.dp_status_lbl.config(text=f"Result: {res_val}", foreground=color)
+                self.dp_output.insert(tk.END, "=== DAVIS-PUTNAM SAT SOLVER ===\n")
+                self.dp_output.insert(tk.END, f"Strategy Used: {strat_name.upper()}\n")
+                self.dp_output.insert(tk.END, f"Satisfiability: {res_val}\n")
+                self.dp_output.insert(tk.END, f"Truth Values Assigned: {model_val}\n")
+            else:
+                moms_res, moms_model = self.query_dp_strategy(temp_file, "moms")
+                dlis_res, dlis_model = self.query_dp_strategy(temp_file, "dlis")
+                self.dp_status_lbl.config(text="Result: Comparison Complete", foreground="blue")
+                self.dp_output.insert(tk.END, "=== STRATEGY COMPARISON: MOMS vs DLIS ===\n\n")
+                self.dp_output.insert(tk.END, "--- 1. Strategy MOMS (Max Occurrences in Minimum Clauses) ---\n")
+                self.dp_output.insert(tk.END, f"Result: {moms_res}\nModel:  {moms_model}\n")
+                self.dp_output.insert(tk.END, "\n--- 2. Strategy DLIS (Dynamic Largest Individual Sum) ---\n")
+                self.dp_output.insert(tk.END, f"Result: {dlis_res}\nModel:  {dlis_model}\n")
 
 
 def main():

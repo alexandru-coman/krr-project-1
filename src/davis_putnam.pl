@@ -75,8 +75,6 @@ pick_pivot_atom(Clauses, moms, Pivot) :-
     most_frequent_atom(MinClauses, Pivot), !.
 pick_pivot_atom(Clauses, dlis, Pivot) :-
     most_frequent_atom(Clauses, Pivot), !.
-pick_pivot_atom(Clauses, _, Pivot) :-
-    pick_pivot_atom(Clauses, moms, Pivot).
 
 most_frequent_atom(Clauses, BestAtom) :-
     collect_all_atoms(Clauses, Atoms),
@@ -124,11 +122,6 @@ fill_missing_atoms(AllAtoms, PartialModel, CompleteModel) :-
 
 format_solution(Model, Formatted) :-
     sort(Model, Sorted),
-    findall(Entry,
-        (member(assign(A, V), Sorted), display_atom(A, Name), format(string(Entry), "~w/~w", [Name, V])),
-        Entries),
+    findall(Entry, (member(assign(A, V), Sorted), format(string(Entry), "~w/~w", [A, V])), Entries),
     atomic_list_concat(Entries, '; ', Inner),
     format(string(Formatted), "{~w}", [Inner]).
-
-display_atom(var(Name), Name) :- !.
-display_atom(Atom, Atom).
